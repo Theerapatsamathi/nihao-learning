@@ -44,3 +44,9 @@ test('calcMonth1Stats computes progress percentage', () => {
   assert.equal(st.pct, 10);
   assert.equal(st.tonePairsDone, 2);
 });
+
+import { extractChineseChars } from '../src/features/month1/copybook.js';
+
+test('extractChineseChars deduplicates and filters only Hanzi', () => {
+  assert.deepEqual(extractChineseChars('你好! 你好 123 谢谢'), ['你', '好', '谢']);
+});
