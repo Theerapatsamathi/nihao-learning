@@ -1,0 +1,16 @@
+{
+  "name": "nihao-learning",
+  "version": "0.3.0",
+  "private": true,
+  "scripts": {
+    "dev": "netlify dev",
+    "dev:local": "node tools/server.cjs"
+  },
+  "dependencies": {
+    "@google/genai": "^3.6.1",
+    "@netlify/blobs": "^8.1.0",
+    "@netlify/database": "^2.0.3",
+    "@netlify/functions": "^6.1.1",
+    "@netlify/identity": "^2.0.1"
+  }
+}

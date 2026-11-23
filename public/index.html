@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="th" class="theme-light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#007aff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="你好 Nihao">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <title>你好 Nihao · แพลตฟอร์มเรียนจีน Level 1–2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell theme-light" id="app-shell">
+    <!-- 52px Frosted Glass Header (Nakon-TRS Style) -->
+    <header class="app-header">
+      <div class="brand">
+        <button type="button" class="header-icon-btn mobile-menu-btn" id="mobile-menu-btn" aria-label="เปิดเมนู">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="brand-mark hanzi-font">拼</div>
+        <div class="brand-info">
+          <span class="brand-title">你好 Nihao</span>
+          <span class="brand-sub">Level 1 · พื้นฐานพินอิน</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button type="button" class="auth-pill" id="header-auth-btn" title="เข้าสู่ระบบเพื่อเก็บข้อมูลแยก Account บนฐานข้อมูล">
+          <span class="auth-dot" id="header-auth-dot"></span>
+          <span id="header-auth-label">เข้าสู่ระบบ</span>
+        </button>
+        <button type="button" class="btn-secondary" id="pwa-install-btn" hidden>ติดตั้งแอป</button>
+        <button type="button" class="xp-pill tabular-nums" id="header-xp-pill" title="ดูโปรไฟล์และเลเวล">
+          <span class="xp-lv" id="header-lv">LV.1</span>
+          <span class="xp-val" id="header-xp">0 XP</span>
+        </button>
+        <div class="segmented-control" role="group" aria-label="ความเร็วเสียงอ่าน">
+          <button type="button" id="speed-normal" class="active" data-rate="0.85">ปกติ</button>
+          <button type="button" id="speed-slow" data-rate="0.55">ช้าชัดๆ</button>
+        </div>
+        <button type="button" class="header-icon-btn" id="panda-toggle" aria-label="เปิด/ปิดน้องเป่าเปา" title="เปิด/ปิดน้องเป่าเปา (มาสคอต)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="13" r="7.5"/><circle cx="9.5" cy="12" r="1" fill="currentColor"/><circle cx="14.5" cy="12" r="1" fill="currentColor"/><path d="M10.5 15.5c.8.8 2.2.8 3 0"/></svg>
+        </button>
+        <button type="button" class="header-icon-btn" id="sfx-toggle" aria-label="เปิด/ปิดเสียงเอฟเฟกต์" title="เปิด/ปิดเสียงเอฟเฟกต์">
+          <svg id="sfx-icon-on" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+          <svg id="sfx-icon-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        </button>
+        <button type="button" class="header-icon-btn" id="theme-toggle" aria-label="สลับโหมดสว่าง/มืด" title="สลับโหมดสว่าง/มืด">
+          <svg id="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          <svg id="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- App Body: Floating Sidebar + Scrollable Main Workspace -->
+    <div class="app-body">
+      <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+      <aside class="sidebar" id="sidebar" aria-label="เมนูบทเรียน">
+        <nav class="nav-panel" role="tablist">
+          <div class="nav-section">Learning Path</div>
+          <button type="button" class="nav-link" data-tab="profile" role="tab" aria-selected="false">
+            <span class="nav-icon icon-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
+            <span class="nav-label-text">โปรไฟล์ & แผนที่ด่าน</span>
+            <span class="nav-badge" id="nav-lv-badge">LV.1</span>
+          </button>
+          <button type="button" class="nav-link active" data-tab="plan" role="tab" aria-selected="true">
+            <span class="nav-icon icon-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+            <span class="nav-label-text">แผนเรียน 14 วัน</span>
+            <span class="nav-badge" id="nav-days-badge">0/14</span>
+          </button>
+          <button type="button" class="nav-link" data-tab="vocab" role="tab" aria-selected="false">
+            <span class="nav-icon icon-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+            <span class="nav-label-text">คำศัพท์พื้นฐาน</span>
+            <span class="nav-badge" id="nav-vocab-badge">0/100</span>
+          </button>
+
+          <div class="nav-section">Pinyin System</div>
+          <button type="button" class="nav-link" data-tab="initials" role="tab" aria-selected="false">
+            <span class="nav-icon icon-indigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></span>
+            <span class="nav-label-text">พยัญชนะต้น</span>
+            <span class="nav-badge muted-badge">23</span>
+          </button>
+          <button type="button" class="nav-link" data-tab="finals" role="tab" aria-selected="false">
+            <span class="nav-icon icon-cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></span>
+            <span class="nav-label-text">สระพินอิน</span>
+            <span class="nav-badge muted-badge">36</span>
+          </button>
+          <button type="button" class="nav-link" data-tab="tones" role="tab" aria-selected="false">
+            <span class="nav-icon icon-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+            <span class="nav-label-text">วรรณยุกต์ & กฎผัน</span>
+            <span class="nav-badge muted-badge">4+1</span>
+          </button>
+          <button type="button" class="nav-link" data-tab="chart" role="tab" aria-selected="false">
+            <span class="nav-icon icon-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span>
+            <span class="nav-label-text">ตารางพินอินเต็ม</span>
+            <span class="nav-badge muted-badge">405</span>
+          </button>
+          <button type="button" class="nav-link" data-tab="combiner" role="tab" aria-selected="false">
+            <span class="nav-icon icon-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+            <span class="nav-label-text">ห้องผสมคำ</span>
+          </button>
+
+          <div class="nav-section">Practice & Writing</div>
+          <button type="button" class="nav-link" data-tab="writing" role="tab" aria-selected="false">
+            <span class="nav-icon icon-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg></span>
+            <span class="nav-label-text">ฝึกเขียนลำดับขีด</span>
+            <span class="nav-badge muted-badge">32</span>
+          </button>
+          <button type="button" class="nav-link" data-tab="srs" role="tab" aria-selected="false">
+            <span class="nav-icon icon-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 2v4"/><path d="M16 2v4"/><path d="M7 12h10"/></svg></span>
+            <span class="nav-label-text">การ์ด SRS & บทสนทนา</span>
+            <span class="nav-badge" id="nav-srs-badge">34</span>
+          </button>
+          <button type="button" class="nav-link" data-tab="speed" role="tab" aria-selected="false">
+            <span class="nav-icon icon-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+            <span class="nav-label-text">เกม Speed Match</span>
+          </button>
+          <button type="button" class="nav-link" data-tab="practice" role="tab" aria-selected="false">
+            <span class="nav-icon icon-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="nav-label-text">ฝึกฟัง-พูด & สอบเวล 1</span>
+          </button>
+
+          <div class="nav-section">World 2 · HSK 1</div>
+          <button type="button" class="nav-link" data-tab="level2" role="tab" aria-selected="false">
+            <span class="nav-icon icon-indigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h14"/></svg></span>
+            <span class="nav-label-text">แต่งประโยค & HSK 1</span>
+            <span class="nav-badge muted-badge">150</span>
+          </button>
+          <button type="button" class="nav-link" data-tab="tutor" role="tab" aria-selected="false">
+            <span class="nav-icon icon-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <span class="nav-label-text">คู่ซ้อมสนทนาจีน</span>
+            <span class="nav-badge">AI</span>
+          </button>
+          <button type="button" class="nav-link" data-tab="mock" role="tab" aria-selected="false">
+            <span class="nav-icon icon-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+            <span class="nav-label-text">สอบจำลอง HSK 1</span>
+            <span class="nav-badge muted-badge">200</span>
+          </button>
+        </nav>
+
+        <!-- Minimal Level & XP Footer in Sidebar -->
+        <div class="sidebar-footer">
+          <div class="sidebar-progress-head">
+            <span id="sidebar-rank">LV.1 · ผู้เริ่มต้น</span>
+            <strong class="tabular-nums" id="overall-pct">0 XP</strong>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="overall-bar" style="width: 0%"></div>
+          </div>
+          <div class="sidebar-xp-sub tabular-nums" id="sidebar-xp-next">อีก 80 XP ขึ้น LV.2</div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <div class="content-wrap">
+          <div class="audio-banner" id="audio-banner" role="status"></div>
+
+          <!-- TAB: Game Profile, Skill Radar & World Roadmap -->
+          <section class="tab-panel" id="tab-profile">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">โปรไฟล์ผู้เรียน · สกิล & แผนที่ด่าน</h1>
+                <p class="page-desc">สะสม XP อัปเลเวลจากการเรียนจริง ตรวจสอบค่าพลัง 5 สกิล และเส้นทางพิชิตด่านภาษาจีน</p>
+              </div>
+            </div>
+            <div id="profile-content"></div>
+          </section>
+
+          <!-- TAB 0: 14-Day Study Plan & Daily Quizzes -->
+          <section class="tab-panel active" id="tab-plan">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">แผนเรียนจีนเข้มข้น 14 วัน (วันละ 60 นาที)</h1>
+                <p class="page-desc">ตารางฝึก 5 ช่วงต่อวัน ครบทั้งฟัง-พูด-อ่าน-เขียน พร้อมแบบทดสอบเข้มข้นวันละ 10 ข้อ (รวม 140 ข้อ · ผ่านที่ 8/10)</p>
+              </div>
+            </div>
+
+            <!-- Minimal KPI Strip -->
+            <div class="kpi-grid">
+              <div class="kpi-card">
+                <span class="kpi-label">แผนเรียน 14 วัน</span>
+                <strong class="kpi-value tabular-nums" id="stat-days">0 / 14 วัน</strong>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">พยัญชนะ / สระ</span>
+                <strong class="kpi-value tabular-nums" id="stat-pinyin">0/23 · 0/36</strong>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">ฝึกเขียนผ่านแล้ว</span>
+                <strong class="kpi-value tabular-nums" id="stat-writing">0 / 32 ตัว</strong>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">สอบจบ Level 1</span>
+                <strong class="kpi-value tabular-nums" id="stat-quiz">ยังไม่สอบ</strong>
+              </div>
+            </div>
+
+            <div class="plan-layout">
+              <aside class="card-panel plan-sidebar" id="plan-sidebar"></aside>
+              <div class="plan-main" id="plan-main"></div>
+            </div>
+          </section>
+
+          <!-- TAB 1: Initials (23) + Articulation SVG -->
+          <section class="tab-panel" id="tab-initials">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">พยัญชนะต้น 23 ตัว (声母)</h1>
+                <p class="page-desc">เลือกพยัญชนะเพื่อฟังเสียง ดูแผนภาพตำแหน่งลิ้น และเทียบคู่ที่คนไทยมักสับสน</p>
+              </div>
+            </div>
+            <div class="initials-layout">
+              <div class="card-panel" id="initials-groups"></div>
+              <aside class="card-panel inspector-sticky" id="initial-inspector"></aside>
+            </div>
+          </section>
+
+          <!-- TAB 2: Finals (36) -->
+          <section class="tab-panel" id="tab-finals">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">สระพินอิน 36 เสียง (韵母)</h1>
+                <p class="page-desc">สระเดี่ยว 6 ตัว สระประสม 13 ตัว และสระนาสิกแม่กน (-n) / แม่กง (-ng)</p>
+              </div>
+            </div>
+            <div class="finals-filter" id="finals-filter"></div>
+            <div id="finals-content"></div>
+          </section>
+
+          <!-- TAB 3: Tones & Rules -->
+          <section class="tab-panel" id="tab-tones">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">วรรณยุกต์ 4 เสียง + กฎผันเสียง (声调)</h1>
+                <p class="page-desc">ฝึกฟังเส้นระดับเสียง (Pitch Contour) เทียบ 4 เสียงติดกัน และกฎผันเสียงสำคัญ</p>
+              </div>
+            </div>
+            <div class="tones-grid" id="tones-grid"></div>
+
+            <div class="card-panel tone-sets-box">
+              <div class="section-row">
+                <div>
+                  <h2 class="section-subtitle">ฝึกฟังเทียบ 4 เสียงติดกัน (Minimal Pairs)</h2>
+                  <p class="section-subdesc">เลือกชุดคำ แล้วกดฟังทีละเสียงหรือเล่นรวดเดียว 1→4</p>
+                </div>
+                <button type="button" class="btn-primary" id="play-tone-sequence">▶ เล่นรวดเดียว 1 → 4</button>
+              </div>
+              <div class="set-tabs" id="tone-set-tabs"></div>
+              <div class="tone-pair-grid" id="tone-pair-grid"></div>
+            </div>
+
+            <h2 class="section-subtitle" style="margin:20px 0 10px">กฎการผันเสียงและวางวรรณยุกต์</h2>
+            <div class="rules-grid" id="tone-rules-grid"></div>
+          </section>
+
+          <!-- TAB 4: Complete Mandarin Pinyin Chart (405 Syllables) -->
+          <section class="tab-panel" id="tab-chart">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">ตารางพินอินเต็ม 405 พยางค์</h1>
+                <p class="page-desc">ครบทุกพยางค์ที่ใช้จริงในภาษาจีนกลาง กดช่องไหนก็ได้เพื่อฟังทั้ง 4 วรรณยุกต์</p>
+              </div>
+            </div>
+
+            <div class="chart-toolbar">
+              <div class="finals-filter" id="chart-filter" style="margin:0"></div>
+              <div class="chart-legend">
+                <span class="legend-item"><i class="swatch swatch-udot"></i> ตัดจุด ü</span>
+                <span class="legend-item"><i class="swatch swatch-apical"></i> สระ i ออกเสียง "อือ"</span>
+              </div>
+            </div>
+
+            <div class="card-panel chart-inspector" id="chart-inspector"></div>
+
+            <div class="card-panel chart-wrap">
+              <div class="chart-scroll" id="pinyin-matrix"></div>
+            </div>
+          </section>
+
+          <!-- TAB 5: Pinyin Combiner Lab -->
+          <section class="tab-panel" id="tab-combiner">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">ห้องทดลองผสมคำพินอิน</h1>
+                <p class="page-desc">จับคู่ พยัญชนะ + สระ + วรรณยุกต์ เพื่อดูคำอ่านและกฎการสะกดที่ถูกต้อง</p>
+              </div>
+            </div>
+            <div class="combiner-layout">
+              <div class="card-panel">
+                <div class="picker-label">1. พยัญชนะต้น (声母)</div>
+                <div class="chip-grid" id="combiner-initials"></div>
+
+                <div class="picker-label">2. สระ (韵母)</div>
+                <div class="chip-grid" id="combiner-finals"></div>
+
+                <div class="picker-label">3. วรรณยุกต์ (声调)</div>
+                <div class="chip-grid" id="combiner-tones"></div>
+              </div>
+              <div class="card-panel combiner-result" id="combiner-result"></div>
+            </div>
+          </section>
+
+          <!-- TAB 6: Basic Strokes & Interactive Hanzi Writing Studio -->
+          <section class="tab-panel" id="tab-writing">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">ฝึกเขียนลำดับขีดอักษรจีน</h1>
+                <p class="page-desc">8 ขีดพื้นฐาน กฎลำดับขีด และกระดานฝึกเขียน 32 ตัวอักษร Level 1 บนตาราง 米字格</p>
+              </div>
+            </div>
+
+            <div class="writing-layout">
+              <div class="card-panel writing-stage">
+                <div class="writing-head">
+                  <div>
+                    <div class="writing-char-meta">
+                      <span class="writing-big-py" id="wr-pinyin">一 · yī</span>
+                      <span class="writing-meaning" id="wr-meaning">หนึ่ง (1)</span>
+                    </div>
+                    <div class="writing-tip" id="wr-tip"></div>
+                  </div>
+                  <button type="button" class="btn-secondary" id="wr-speak">ฟังเสียง</button>
+                </div>
+
+                <div class="writing-mode-switch" role="group" aria-label="โหมดฝึกเขียน">
+                  <button type="button" class="filter-pill active" data-wmode="quiz">ตรวจลำดับขีด</button>
+                  <button type="button" class="filter-pill" data-wmode="free">เขียนอิสระ</button>
+                </div>
+
+                <div class="mizige-box" id="mizige-box">
+                  <svg class="mizige-grid" viewBox="0 0 260 260" aria-hidden="true">
+                    <rect x="2" y="2" width="256" height="256" fill="none" stroke="var(--sys-red)" stroke-width="1.5" opacity="0.35"/>
+                    <line x1="130" y1="2" x2="130" y2="258" stroke="var(--sys-red)" stroke-dasharray="4 4" opacity="0.28"/>
+                    <line x1="2" y1="130" x2="258" y2="130" stroke="var(--sys-red)" stroke-dasharray="4 4" opacity="0.28"/>
+                    <line x1="2" y1="2" x2="258" y2="258" stroke="var(--sys-red)" stroke-dasharray="4 4" opacity="0.16"/>
+                    <line x1="258" y1="2" x2="2" y2="258" stroke="var(--sys-red)" stroke-dasharray="4 4" opacity="0.16"/>
+                  </svg>
+                  <div id="hanzi-writer-target"></div>
+                  <canvas id="freehand-canvas" width="260" height="260" hidden></canvas>
+                </div>
+
+                <div class="writing-status" id="wr-status">ลองลากขีดตามลำดับที่ถูกต้องได้เลย</div>
+
+                <div class="writing-controls">
+                  <button type="button" class="btn-secondary" id="wr-animate">ดูแอนิเมชัน</button>
+                  <button type="button" class="btn-secondary" id="wr-outline">เปิด/ปิดเส้นร่าง</button>
+                  <button type="button" class="btn-secondary" id="wr-reset">เริ่มใหม่</button>
+                </div>
+              </div>
+
+              <div class="card-panel">
+                <div class="section-row" style="margin-bottom:12px">
+                  <h2 class="section-subtitle">เลือกตัวอักษร (32 ตัว · ง่ายไปยาก)</h2>
+                  <span class="nav-badge muted-badge" id="wr-count-badge">0 / 32</span>
+                </div>
+                <div class="char-picker-grid" id="wr-char-grid"></div>
+              </div>
+            </div>
+
+            <h2 class="section-subtitle" style="margin:24px 0 10px">8 ขีดพื้นฐาน (基本笔画)</h2>
+            <div class="strokes-grid" id="strokes-grid"></div>
+
+            <h2 class="section-subtitle" style="margin:22px 0 10px">4 กฎทองลำดับขีด</h2>
+            <div class="rules-grid" id="stroke-rules-grid"></div>
+          </section>
+
+          <!-- TAB 7: Practice, Speaking Lab & Level 1 Exam -->
+          <section class="tab-panel" id="tab-practice">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">ฝึกฟัง-พูด & สอบจบ Level 1</h1>
+                <p class="page-desc">เลือกโหมดฝึกแยกวรรณยุกต์ คู่เสียงสับสน พูดใส่ไมโครโฟน หรือสอบวัดระดับ 10 ข้อ</p>
+              </div>
+            </div>
+
+            <div class="drill-selector" id="drill-selector">
+              <button type="button" class="drill-mode-card active" data-mode="tones">
+                <strong>ฝึกฟังแยกวรรณยุกต์</strong>
+                <span>ฟังพยางค์แล้วเลือกเสียงที่ 1–4</span>
+              </button>
+              <button type="button" class="drill-mode-card" data-mode="pairs">
+                <strong>แยกเสียงคู่สับสน</strong>
+                <span>b/p, d/t, zh/z, sh/s, q/ch/c, u/ü</span>
+              </button>
+              <button type="button" class="drill-mode-card" data-mode="speaking">
+                <strong>ฝึกพูดใส่ไมโครโฟน</strong>
+                <span>ตรวจความชัดสำเนียงแบบเรียลไทม์</span>
+              </button>
+              <button type="button" class="drill-mode-card" data-mode="weakspot">
+                <strong>ซ่อมจุดอ่อนอัตโนมัติ</strong>
+                <span>วนทบทวนเฉพาะข้อที่เคยตอบผิด</span>
+              </button>
+              <button type="button" class="drill-mode-card" data-mode="typing">
+                <strong>ฝึกพิมพ์พินอิน (Keyboard)</strong>
+                <span>พิมพ์ ni3 hao3 แปลงวรรณยุกต์สด</span>
+              </button>
+              <button type="button" class="drill-mode-card" data-mode="mastery">
+                <strong>สอบจบ Level 1 (10 ข้อ)</strong>
+                <span>เกณฑ์ผ่าน 8/10 พร้อมเฉลยละเอียด</span>
+              </button>
+            </div>
+
+            <div class="card-panel drill-stage" id="drill-stage"></div>
+          </section>
+
+          <!-- TAB: SRS Flashcards & Mini Dialogues -->
+          <section class="tab-panel" id="tab-srs">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">การ์ดจำ SRS & บทสนทนาสั้น</h1>
+                <p class="page-desc">ทบทวนคำศัพท์ระยะยาวแบบ Anki และฝึกฟังบทสนทนาจริงระดับ Level 1</p>
+              </div>
+              <div class="segmented-control" id="srs-mode-switch" role="group">
+                <button type="button" class="active" data-smode="flashcard">การ์ด SRS</button>
+                <button type="button" data-smode="dialogue">บทสนทนาสั้น (4)</button>
+                <button type="button" data-smode="podcast">ฟังเพลิน Hands-Free</button>
+              </div>
+            </div>
+            <div id="srs-content"></div>
+          </section>
+
+          <!-- TAB: Speed Match 60s & Hanzi Rain Arcade -->
+          <section class="tab-panel" id="tab-speed">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">มินิเกมฝึกจำคำจีน (Arcade)</h1>
+                <p class="page-desc">เลือกเล่น Speed Match 60 วิ หรือเกมฝนอักษรจีนตกจากฟ้าเพื่อฝึกปฏิกิริยาและเก็บ XP</p>
+              </div>
+              <div class="segmented-control" id="game-mode-switch" role="group">
+                <button type="button" class="active" data-gmode="speed">Speed Match 60 วิ</button>
+                <button type="button" data-gmode="rain">ฝนอักษรจีน (Hanzi Rain)</button>
+              </div>
+            </div>
+            <div id="speed-content"></div>
+          </section>
+
+          <!-- TAB: World 2 — Sentence Builder, HSK 1 Grammar & 150 Words -->
+          <section class="tab-panel" id="tab-level2">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">World 2 · แต่งประโยค & HSK 1 (150 คำ)</h1>
+                <p class="page-desc">ต่อยอดจากพินอินสู่การแต่งประโยคจีนจริง เรื่องสั้น รากศัพท์ ศัพท์โซเชียล และคำศัพท์ HSK 1</p>
+              </div>
+              <div class="segmented-control" id="l2-mode-switch" role="group">
+                <button type="button" class="active" data-l2mode="builder">เรียงประโยค (20)</button>
+                <button type="button" data-l2mode="readers">เรื่องสั้น (4)</button>
+                <button type="button" data-l2mode="radicals">รากศัพท์ (25)</button>
+                <button type="button" data-l2mode="culture">โซเชียล/เที่ยว</button>
+                <button type="button" data-l2mode="grammar">ไวยากรณ์ (8)</button>
+                <button type="button" data-l2mode="hsk1">HSK 1 (150)</button>
+              </div>
+            </div>
+            <div id="level2-content"></div>
+          </section>
+
+          <!-- TAB: World 2 — Chinese Conversation Tutor -->
+          <section class="tab-panel" id="tab-tutor">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">คู่ซ้อมสนทนาภาษาจีน (Level 1–2 Tutor)</h1>
+                <p class="page-desc">พิมพ์หรือพูดภาษาจีนโต้ตอบจริง มีพินอิน คำแปลไทย และคำแนะนำไวยากรณ์ทุกประโยค</p>
+              </div>
+            </div>
+            <div id="tutor-content"></div>
+          </section>
+
+          <!-- TAB: Full HSK 1 Mock Exam (200 Points / 15 Mins) -->
+          <section class="tab-panel" id="tab-mock">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">สนามสอบจำลอง HSK 1 เต็มรูปแบบ</h1>
+                <p class="page-desc">พาร์ตการฟัง 10 ข้อ (100 คะแนน) + พาร์ตการอ่าน/ไวยากรณ์ 10 ข้อ (100 คะแนน) · จับเวลา 15 นาที · เกณฑ์ผ่าน 120/200</p>
+              </div>
+            </div>
+            <div id="mock-content"></div>
+          </section>
+
+          <!-- TAB 8: Core Vocabulary & Daily 100-Word Bank -->
+          <section class="tab-panel" id="tab-vocab">
+            <div class="page-head">
+              <div>
+                <h1 class="page-title">คลังคำศัพท์พื้นฐาน & สะสมวันละ 100 คำ</h1>
+                <p class="page-desc">คำศัพท์จีน-ไทยมาตรฐาน HSK 1–7+ กว่า 10,969 คำ แบ่งชุดละ 100 คำ พร้อมเสียงอ่าน โหมดทบทวน และติดตามยอดสะสมรายวัน</p>
+              </div>
+            </div>
+            <div class="vocab-mode-tabs" id="vocab-mode-tabs">
+              <button type="button" class="vocab-mode-btn active" data-vmode="bank">คลังศัพท์ 100 คำ/วัน</button>
+              <button type="button" class="vocab-mode-btn" data-vmode="srs">🔄 ทวน SRS <span class="vtab-pill" id="vtab-srs-due">0</span></button>
+              <button type="button" class="vocab-mode-btn" data-vmode="quiz">🎯 ควิซ · พูด · พิมพ์</button>
+              <button type="button" class="vocab-mode-btn" data-vmode="games">⚡ เกมศัพท์</button>
+              <button type="button" class="vocab-mode-btn" data-vmode="podcast">🎧 Podcast</button>
+              <button type="button" class="vocab-mode-btn" data-vmode="story">📖 นิทาน</button>
+              <button type="button" class="vocab-mode-btn" data-vmode="confusable">🧠 คำคล้าย</button>
+              <button type="button" class="vocab-mode-btn" data-vmode="stats">📊 สถิติ & Backup</button>
+              <button type="button" class="vocab-mode-btn" data-vmode="level1">Level 1 (34)</button>
+            </div>
+            <div id="vocab-bank-view"></div>
+            <div id="vocab-srs-view" hidden></div>
+            <div id="vocab-quiz-view" hidden></div>
+            <div id="vocab-games-view" hidden></div>
+            <div id="vocab-podcast-view" hidden></div>
+            <div id="vocab-story-view" hidden></div>
+            <div id="vocab-confusable-view" hidden></div>
+            <div id="vocab-stats-view" hidden></div>
+            <div class="vocab-layout" id="vocab-level1-view" hidden>
+              <div class="pack-list" id="vocab-pack-list"></div>
+              <div>
+                <div id="vocab-pack-header" style="margin-bottom:12px"></div>
+                <div class="vocab-grid" id="vocab-grid"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+    <div class="vb-modal-backdrop" id="vb-modal-backdrop" hidden></div>
+    <div class="confetti-layer" id="confetti-layer" aria-hidden="true"></div>
+    <div class="panda-stage" id="panda-stage" aria-live="polite">
+      <div class="panda-actor" id="panda-actor" role="button" tabindex="0" title="กดทักทายน้องเป่าเปา (宝宝)">
+        <div class="panda-bubble" id="panda-bubble">你好! มาลุยจีนกัน!</div>
+        <div class="panda-sprite" id="panda-sprite"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/vendor/hanzi-writer.min.js" defer></script>
+  <script src="/data/level1-data.js"></script>
+  <script src="/data/pinyin-chart-data.js"></script>
+  <script src="/data/writing-speaking-data.js"></script>
+  <script src="/data/daily-plan-data.js"></script>
+  <script src="/data/engagement-data.js"></script>
+  <script src="/data/level2-hsk1-data.js"></script>
+  <script src="/data/pro-pack-data.js"></script>
+  <script src="/data/fun-pack-data.js"></script>
+  <script type="module">
+    const isNetlifyOrigin =
+      window.location.protocol === 'https:' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+    if (isNetlifyOrigin) {
+      import('https://esm.sh/@netlify/identity@2.0.1')
+        .then((mod) => {
+          window.NetlifyAuth = mod;
+          window.dispatchEvent(new CustomEvent('netlify-auth-ready'));
+        })
+        .catch(() => {});
+    }
+  </script>
+  <script src="/app.js"></script>
+</body>
+</html>

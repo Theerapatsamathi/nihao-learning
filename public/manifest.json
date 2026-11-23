@@ -1,0 +1,17 @@
+{
+  "name": "你好 Nihao · เรียนจีนพื้นฐาน Level 1–2",
+  "short_name": "你好 Nihao",
+  "description": "แพลตฟอร์มเรียนภาษาจีนสำหรับคนไทย ครบทั้งพินอิน ฟัง-พูด-อ่าน-เขียน แผน 14 วัน และ HSK 1",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#007aff",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+Vocabulary source: https://github.com/paamzuza77/hsk-thai
+lexicon.js selects entries with Thai glosses and HSK levels, deduplicated and reformatted.
+Combined vocabulary data: CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/
+For noncommercial educational use. Some Thai glosses are machine translated.
+Upstream credits: complete-hsk-vocabulary (MIT), CC-CEDICT (CC BY-SA), Unihan,
+Wiktionary (CC BY-SA 4.0), Wikidata (CC0), Open Multilingual WordNet (CC BY 4.0, Bond & Foster 2013),
+PanLex (CC BY-NC-SA 4.0, a part of the PanLex project of The Long Now Foundation).
