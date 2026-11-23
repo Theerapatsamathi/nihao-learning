@@ -8354,6 +8354,16 @@ if (typeof window !== 'undefined') {
     });
   });
 
+  // ---- NETLIFY IDENTITY + POSTGRES CLOUD SYNC STATE ----
+  const authState = {
+    user: null,
+    settings: null,
+    syncing: false,
+    lastSyncedAt: null,
+    syncTimer: null,
+    modalTab: 'login'
+  };
+
   // ---- Initial Render ----
   const initStats = computeGameStats();
   lastKnownXp = initStats.xp;
@@ -8380,14 +8390,6 @@ if (typeof window !== 'undefined') {
   renderMockExamPage();
 
   // ---- NETLIFY IDENTITY + POSTGRES CLOUD SYNC ----
-  const authState = {
-    user: null,
-    settings: null,
-    syncing: false,
-    lastSyncedAt: null,
-    syncTimer: null,
-    modalTab: 'login'
-  };
 
   function updateAuthButton() {
     const label = document.getElementById('header-auth-label');
