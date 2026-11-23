@@ -1,0 +1,568 @@
+/* ==========================================================================
+   Platform Feature Group (`pf-` prefix) + Global Display Mode Rules (#10)
+   ========================================================================== */
+
+/* --- #10 Global Display Mode: Hide Pinyin (Hanzi only) --- */
+html.pf-hide-pinyin .pinyin,
+html.pf-hide-pinyin .py,
+html.pf-hide-pinyin .vocab-pinyin,
+html.pf-hide-pinyin .vb-pinyin,
+html.pf-hide-pinyin .vb-row-pinyin,
+html.pf-hide-pinyin .vb-ex-py,
+html.pf-hide-pinyin .vb-modal-py,
+html.pf-hide-pinyin .fc-pinyin,
+html.pf-hide-pinyin .vsrs-fc-py,
+html.pf-hide-pinyin .vq-prompt-py,
+html.pf-hide-pinyin .vq-ch-py,
+html.pf-hide-pinyin .vq-wrong-py,
+html.pf-hide-pinyin .vst-line-py,
+html.pf-hide-pinyin .vcf-py,
+html.pf-hide-pinyin .tok-py,
+html.pf-hide-pinyin .chat-py,
+html.pf-hide-pinyin .example-pinyin,
+html.pf-hide-pinyin .podcast-word-py,
+html.pf-hide-pinyin .speaking-target-py,
+html.pf-hide-pinyin .writing-big-py,
+html.pf-hide-pinyin [data-pf-role="pinyin"] {
+  display: none !important;
+}
+
+/* --- #10 Global Display Mode: Hide Hanzi (Pinyin only) --- */
+html.pf-hide-hanzi .hanzi,
+html.pf-hide-hanzi .hz,
+html.pf-hide-hanzi .vocab-hanzi,
+html.pf-hide-hanzi .vb-hanzi,
+html.pf-hide-hanzi .vb-row-hanzi,
+html.pf-hide-hanzi .vb-ex-hz,
+html.pf-hide-hanzi .vb-modal-hz,
+html.pf-hide-hanzi .fc-hanzi,
+html.pf-hide-hanzi .vsrs-fc-hz,
+html.pf-hide-hanzi .vq-prompt-hz,
+html.pf-hide-hanzi .vq-ch-hz,
+html.pf-hide-hanzi .vq-wrong-hz,
+html.pf-hide-hanzi .vst-line-hz,
+html.pf-hide-hanzi .vcf-hz,
+html.pf-hide-hanzi .tok-hz,
+html.pf-hide-hanzi .chat-hanzi,
+html.pf-hide-hanzi .example-hanzi,
+html.pf-hide-hanzi .podcast-word-hz,
+html.pf-hide-hanzi .speaking-target-hanzi,
+html.pf-hide-hanzi [data-pf-role="hanzi"] {
+  display: none !important;
+}
+
+/* --- #10 Global Display Mode: Character Mode (hide pinyin until hover/tap) --- */
+html.pf-char-mode .pinyin,
+html.pf-char-mode .py,
+html.pf-char-mode .vocab-pinyin,
+html.pf-char-mode .vb-pinyin,
+html.pf-char-mode .vb-row-pinyin,
+html.pf-char-mode .vb-ex-py,
+html.pf-char-mode .vb-modal-py,
+html.pf-char-mode .fc-pinyin,
+html.pf-char-mode .vsrs-fc-py,
+html.pf-char-mode .vq-prompt-py,
+html.pf-char-mode .vq-ch-py,
+html.pf-char-mode .vq-wrong-py,
+html.pf-char-mode .vst-line-py,
+html.pf-char-mode .vcf-py,
+html.pf-char-mode .tok-py,
+html.pf-char-mode .chat-py,
+html.pf-char-mode .example-pinyin,
+html.pf-char-mode .podcast-word-py,
+html.pf-char-mode .speaking-target-py,
+html.pf-char-mode .writing-big-py,
+html.pf-char-mode [data-pf-role="pinyin"] {
+  opacity: 0.08;
+  filter: blur(5px);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: opacity 0.18s var(--sys-ease), filter 0.18s var(--sys-ease);
+}
+
+html.pf-char-mode .pinyin:hover,
+html.pf-char-mode .py:hover,
+html.pf-char-mode .vocab-pinyin:hover,
+html.pf-char-mode .vb-pinyin:hover,
+html.pf-char-mode .vb-row-pinyin:hover,
+html.pf-char-mode .vb-ex-py:hover,
+html.pf-char-mode .vb-modal-py:hover,
+html.pf-char-mode .fc-pinyin:hover,
+html.pf-char-mode .vsrs-fc-py:hover,
+html.pf-char-mode .vq-prompt-py:hover,
+html.pf-char-mode .vq-ch-py:hover,
+html.pf-char-mode .vq-wrong-py:hover,
+html.pf-char-mode .vst-line-py:hover,
+html.pf-char-mode .vcf-py:hover,
+html.pf-char-mode .tok-py:hover,
+html.pf-char-mode .chat-py:hover,
+html.pf-char-mode .example-pinyin:hover,
+html.pf-char-mode .podcast-word-py:hover,
+html.pf-char-mode .speaking-target-py:hover,
+html.pf-char-mode .writing-big-py:hover,
+html.pf-char-mode [data-pf-role="pinyin"]:hover,
+html.pf-char-mode .pf-revealed {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* --- Exclude Pinyin-teaching tabs from global display hiding --- */
+html.pf-hide-pinyin #tab-chart *,
+html.pf-hide-pinyin #tab-initials *,
+html.pf-hide-pinyin #tab-finals *,
+html.pf-hide-pinyin #tab-combiner *,
+html.pf-hide-pinyin #tab-tones *,
+html.pf-hide-hanzi #tab-chart *,
+html.pf-hide-hanzi #tab-initials *,
+html.pf-hide-hanzi #tab-finals *,
+html.pf-hide-hanzi #tab-combiner *,
+html.pf-hide-hanzi #tab-tones * {
+  display: revert !important;
+}
+
+html.pf-char-mode #tab-chart *,
+html.pf-char-mode #tab-initials *,
+html.pf-char-mode #tab-finals *,
+html.pf-char-mode #tab-combiner *,
+html.pf-char-mode #tab-tones * {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* --- Floating Quick-Toggle Chip --- */
+.pf-floating-chip {
+  position: fixed;
+  left: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 90;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--sys-separator-strong);
+  background: var(--sys-material);
+  backdrop-filter: var(--sys-blur);
+  -webkit-backdrop-filter: var(--sys-blur);
+  color: var(--sys-label);
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: var(--sys-shadow-2);
+  cursor: pointer;
+  transition: transform 0.16s var(--sys-ease), background 0.16s var(--sys-ease);
+}
+.pf-floating-chip:hover {
+  transform: translateY(-1px);
+  background: var(--sys-surface);
+}
+.pf-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--sys-accent-tint);
+  color: var(--sys-accent-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* --- SW Update Toast --- */
+.pf-update-toast {
+  position: fixed;
+  right: 16px;
+  top: 64px;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--sys-radius-md);
+  background: var(--sys-surface);
+  color: var(--sys-label);
+  border: 1px solid var(--sys-separator-strong);
+  box-shadow: var(--sys-shadow-2);
+  font-size: 13px;
+}
+.pf-update-btn {
+  padding: 5px 10px !important;
+  font-size: 12px !important;
+}
+.pf-update-close {
+  border: none;
+  background: transparent;
+  color: var(--sys-label-2);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 14px;
+}
+
+/* --- Word of the Day Banner on #tab-plan --- */
+.pf-wotd-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-left: 4px solid var(--sys-accent);
+}
+.pf-wotd-banner-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.pf-wotd-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--sys-accent-tint);
+  color: var(--sys-accent-text);
+}
+.pf-wotd-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.pf-wotd-hz {
+  font-size: 22px;
+  color: var(--sys-label);
+}
+.pf-wotd-py {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sys-accent-text);
+}
+.pf-wotd-th {
+  font-size: 14px;
+  color: var(--sys-label-2);
+}
+.pf-wotd-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pf-btn-sm {
+  padding: 6px 10px !important;
+  font-size: 12.5px !important;
+}
+.pf-icon-dismiss {
+  border: none;
+  background: transparent;
+  color: var(--sys-label-3);
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 14px;
+}
+.pf-icon-dismiss:hover {
+  background: var(--sys-surface-hover);
+  color: var(--sys-label);
+}
+
+/* --- Settings & Offline Page Layout --- */
+.pf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 16px;
+}
+.pf-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pf-card-full {
+  grid-column: 1 / -1;
+}
+.pf-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pf-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--sys-label);
+}
+.pf-card-desc {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--sys-label-2);
+}
+.pf-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--sys-surface-3);
+  color: var(--sys-label-2);
+  white-space: nowrap;
+}
+.pf-badge-ok {
+  background: var(--sys-green-tint);
+  color: var(--sys-green-text);
+}
+.pf-badge-warn {
+  background: var(--sys-orange-tint);
+  color: var(--sys-orange-text);
+}
+
+/* Mode option buttons */
+.pf-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.pf-mode-btn {
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: var(--sys-radius-sm);
+  border: 1px solid var(--sys-separator);
+  background: var(--sys-surface-2);
+  color: var(--sys-label);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pf-mode-btn:hover {
+  background: var(--sys-surface-hover);
+}
+.pf-mode-btn.active {
+  border-color: var(--sys-accent);
+  background: var(--sys-accent-tint);
+}
+.pf-mode-btn strong {
+  display: block;
+  font-size: 13.5px;
+  margin-bottom: 2px;
+}
+.pf-mode-btn span {
+  display: block;
+  font-size: 11.5px;
+  color: var(--sys-label-2);
+}
+
+/* Toggle rows */
+.pf-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sys-separator);
+}
+.pf-row:last-child {
+  border-bottom: none;
+}
+.pf-row-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--sys-label);
+}
+.pf-row-sub {
+  font-size: 12px;
+  color: var(--sys-label-2);
+}
+.pf-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.pf-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.pf-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--sys-separator-strong);
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.pf-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 0.18s var(--sys-ease);
+}
+.pf-switch input:checked + .pf-slider {
+  background: var(--sys-accent);
+}
+.pf-switch input:checked + .pf-slider::before {
+  transform: translateX(20px);
+}
+
+/* Reminder slots */
+.pf-slot-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pf-slot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--sys-surface-3);
+  color: var(--sys-label);
+  font-size: 13px;
+  font-weight: 600;
+}
+.pf-slot-chip button {
+  border: none;
+  background: transparent;
+  color: var(--sys-label-2);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
+.pf-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.pf-input {
+  padding: 7px 10px;
+  border-radius: var(--sys-radius-sm);
+  border: 1px solid var(--sys-separator-strong);
+  background: var(--sys-surface-2);
+  color: var(--sys-label);
+  font-size: 13.5px;
+}
+.pf-note {
+  font-size: 12.5px;
+  color: var(--sys-label-2);
+  background: var(--sys-surface-3);
+  padding: 10px 12px;
+  border-radius: var(--sys-radius-sm);
+  line-height: 1.5;
+}
+
+/* Progress bar for audio pack */
+.pf-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pf-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--sys-surface-3);
+  overflow: hidden;
+}
+.pf-progress-fill {
+  height: 100%;
+  background: var(--sys-accent);
+  width: 0%;
+  transition: width 0.2s ease;
+}
+
+/* WOTD full card */
+.pf-wotd-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 14px;
+  border-radius: var(--sys-radius-md);
+  background: var(--sys-surface-2);
+  border: 1px solid var(--sys-separator);
+  gap: 6px;
+}
+.pf-wotd-big-hz {
+  font-size: 48px;
+  line-height: 1.15;
+  color: var(--sys-label);
+}
+.pf-wotd-big-py {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--sys-accent-text);
+}
+.pf-wotd-big-th {
+  font-size: 16px;
+  color: var(--sys-label);
+}
+.pf-wotd-ex {
+  margin-top: 6px;
+  padding: 8px 12px;
+  border-radius: var(--sys-radius-sm);
+  background: var(--sys-surface-3);
+  font-size: 13px;
+  color: var(--sys-label-2);
+}
+
+/* Storage table */
+.pf-pack-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.pf-pack-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--sys-radius-xs);
+  background: var(--sys-surface-2);
+}
+
+/* What's new list */
+.pf-whatsnew-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.pf-whatsnew-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--sys-radius-sm);
+  background: var(--sys-surface-2);
+  border: 1px solid var(--sys-separator);
+}
+.pf-whatsnew-item strong {
+  font-size: 14px;
+  color: var(--sys-label);
+}
+.pf-whatsnew-item p {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--sys-label-2);
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .pf-mode-grid {
+    grid-template-columns: 1fr;
+  }
+  .pf-floating-chip {
+    left: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    padding: 7px 11px;
+  }
+}

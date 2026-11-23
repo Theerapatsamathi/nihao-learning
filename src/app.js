@@ -52,7 +52,15 @@ if (typeof window !== 'undefined') {
   })();
   let audioCtx = null;
 
-  function playChime(type) {
+  // ---- Feature plugin event bus (used by src/features/*) ----
+  const coreBus = new EventTarget();
+  function emitCore(name, detail = {}) {
+    try { coreBus.dispatchEvent(new CustomEvent(name, { detail })); } catch { /* ignore */ }
+  }
+
+  function playChime(type, noEvent = false) {
+    if (!noEvent && type === 'ok') emitCore('answer', { correct: true });
+    else if (!noEvent && type === 'err') emitCore('answer', { correct: false });
     if (!sfxEnabled) return;
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -287,12 +295,13 @@ if (typeof window !== 'undefined') {
         vocabStarred: Array.isArray(raw.vocabStarred) ? raw.vocabStarred : [],
         vocabNotes: raw.vocabNotes && typeof raw.vocabNotes === 'object' ? raw.vocabNotes : {},
         streakFreezes: Number.isInteger(raw.streakFreezes) && raw.streakFreezes >= 0 ? raw.streakFreezes : 0,
-        frozenDays: Array.isArray(raw.frozenDays) ? raw.frozenDays : []
+        frozenDays: Array.isArray(raw.frozenDays) ? raw.frozenDays : [],
+        ext: raw.ext && typeof raw.ext === 'object' && !Array.isArray(raw.ext) ? raw.ext : {}
       };
       ensureTodayDaily(p);
       return p;
     } catch {
-      const p = { initials: [], finals: [], writing: [], dayScores: {}, dayChecks: {}, drillCorrect: 0, bestQuiz: null, activity: {}, daily: null, bonusXp: 0, mistakes: [], srs: {}, speedBest: 0, rainBest: 0, ownedItems: [], equipped: {}, spentCoins: 0, vocabLearned: {}, vocabGoal: 100, vocabMilestones: {}, vocabMistakes: [], vocabQuizCount: 0, vocabSrs: {}, vocabMatchBest: 0, vocabRainBest: 0, vocabStarred: [], vocabNotes: {}, streakFreezes: 0, frozenDays: [] };
+      const p = { initials: [], finals: [], writing: [], dayScores: {}, dayChecks: {}, drillCorrect: 0, bestQuiz: null, activity: {}, daily: null, bonusXp: 0, mistakes: [], srs: {}, speedBest: 0, rainBest: 0, ownedItems: [], equipped: {}, spentCoins: 0, vocabLearned: {}, vocabGoal: 100, vocabMilestones: {}, vocabMistakes: [], vocabQuizCount: 0, vocabSrs: {}, vocabMatchBest: 0, vocabRainBest: 0, vocabStarred: [], vocabNotes: {}, streakFreezes: 0, frozenDays: [], ext: {} };
       ensureTodayDaily(p);
       return p;
     }
@@ -326,6 +335,7 @@ if (typeof window !== 'undefined') {
     } catch {
       // Ignore storage quota errors
     }
+    emitCore('progress', { reason, xp: stats.xp, xpGained: lastKnownXp !== null ? Math.max(0, stats.xp - lastKnownXp) : 0, level: stats.level });
     if (lastKnownXp !== null && stats.xp > lastKnownXp) {
       const diff = stats.xp - lastKnownXp;
       if (lastKnownLevel !== null && stats.level > lastKnownLevel) {
@@ -333,7 +343,7 @@ if (typeof window !== 'undefined') {
         showToast(`LEVEL UP! ขึ้นเลเวล ${stats.level} (${stats.rank.th})`, `+${diff} XP`, true);
         if (typeof pandaReact === 'function') pandaReact('levelup', stats.level);
       } else {
-        playChime('ok');
+        playChime('ok', true);
         showToast(reason || 'บันทึกความคืบหน้าแล้ว', `+${diff} XP`, false);
         if (typeof pandaReact === 'function') pandaReact('happy', stats.level);
       }
@@ -777,8 +787,14 @@ if (typeof window !== 'undefined') {
       renderMockExamPage();
     } else if (tabId === 'vocab') {
       renderVocab();
+    } else if (featureTabs.has(tabId)) {
+      try { featureTabs.get(tabId).render(document.getElementById('feature-host-' + tabId)); } catch (err) { console.error('[feature]', tabId, err); }
     }
+    emitCore('tab', { tabId });
   }
+
+  // Registry for plugin tabs (populated via NihaoCore.registerTab)
+  const featureTabs = new Map();
 
   // ---- ARTICULATION ANATOMY SVG (Phase 1) ----
   function renderArticulationSVG(groupId, aspirated) {
@@ -8388,6 +8404,142 @@ if (typeof window !== 'undefined') {
   renderLevel2Page();
   renderTutorPage();
   renderMockExamPage();
+
+  // ---- NihaoCore: public bridge for feature plugins (src/features/*) ----
+  function ensureFeatureSection(sectionId, title) {
+    const nav = document.querySelector('.nav-panel');
+    if (!nav) return null;
+    let anchor = nav.querySelector(`[data-feature-section="${sectionId}"]`);
+    if (!anchor) {
+      anchor = document.createElement('div');
+      anchor.className = 'nav-section';
+      anchor.dataset.featureSection = sectionId;
+      anchor.textContent = title || sectionId;
+      nav.appendChild(anchor);
+    }
+    return anchor;
+  }
+
+  function registerFeatureTab(def) {
+    if (!def || !def.id || featureTabs.has(def.id)) return null;
+    featureTabs.set(def.id, def);
+    const nav = document.querySelector('.nav-panel');
+    const sectionAnchor = ensureFeatureSection(def.section || 'pro', def.sectionTitle || '✨ Pro Studio');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'nav-link';
+    btn.dataset.tab = def.id;
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', 'false');
+    btn.innerHTML = `<span class="nav-icon ${escapeHtml(def.iconClass || 'icon-purple')}">${def.iconSvg || `<span style="font-size:13px;line-height:1">${escapeHtml(def.emoji || '✨')}</span>`}</span>
+      <span class="nav-label-text">${escapeHtml(def.label || def.id)}</span>
+      ${def.badge !== undefined ? `<span class="nav-badge" id="nav-badge-${escapeHtml(def.id)}">${escapeHtml(def.badge)}</span>` : ''}`;
+    btn.addEventListener('click', () => switchTab(def.id));
+    // Insert after the last button belonging to this section
+    let insertAfter = sectionAnchor;
+    let sib = sectionAnchor ? sectionAnchor.nextElementSibling : null;
+    while (sib && !sib.classList.contains('nav-section')) { insertAfter = sib; sib = sib.nextElementSibling; }
+    if (insertAfter && insertAfter.parentNode) insertAfter.parentNode.insertBefore(btn, insertAfter.nextSibling);
+    else if (nav) nav.appendChild(btn);
+
+    const wrap = document.querySelector('.main-content .content-wrap');
+    const panel = document.createElement('section');
+    panel.className = 'tab-panel';
+    panel.id = 'tab-' + def.id;
+    panel.innerHTML = `
+      <div class="page-head"><div>
+        <h1 class="page-title">${escapeHtml(def.title || def.label || def.id)}</h1>
+        ${def.desc ? `<p class="page-desc">${escapeHtml(def.desc)}</p>` : ''}
+      </div></div>
+      <div class="feature-host" id="feature-host-${escapeHtml(def.id)}"></div>`;
+    if (wrap) wrap.appendChild(panel);
+    return { button: btn, panel, host: panel.querySelector('.feature-host') };
+  }
+
+  function getExt(ns) {
+    if (!state.progress.ext || typeof state.progress.ext !== 'object') state.progress.ext = {};
+    if (!state.progress.ext[ns] || typeof state.progress.ext[ns] !== 'object') state.progress.ext[ns] = { updatedAt: 0 };
+    return state.progress.ext[ns];
+  }
+
+  function setExt(ns, patchOrFn, opts = {}) {
+    const cur = getExt(ns);
+    const next = typeof patchOrFn === 'function' ? (patchOrFn(cur) || cur) : Object.assign(cur, patchOrFn);
+    next.updatedAt = Date.now();
+    state.progress.ext[ns] = next;
+    if (opts.save === false) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress)); } catch { /* ignore */ }
+      scheduleCloudSync();
+    } else {
+      saveProgress(opts.reason || '');
+    }
+    return next;
+  }
+
+  window.NihaoCore = {
+    version: 1,
+    state,
+    data: { DATA, CHART, WS, PLAN, ENG, L2, PRO, FUN },
+    get lexicon() { return LEXICON; },
+    ensureLexiconLoaded,
+    allVocabWords,
+    allInitials,
+    allFinals,
+    tutorScenarios: TUTOR_SCENARIOS,
+    // helpers
+    todayKey,
+    escapeHtml,
+    applyToneMark,
+    stripToneMarks,
+    shuffleArray,
+    speak,
+    speakThai,
+    stopSpeech,
+    playChime,
+    showToast,
+    spawnConfetti,
+    pandaSay,
+    switchTab,
+    computeGameStats,
+    updateDashboard,
+    recordMistake,
+    logActivity,
+    saveProgress,
+    addXp(amount, reason = '') {
+      const n = Math.max(0, Math.round(Number(amount) || 0));
+      if (n > 0) state.progress.bonusXp = (state.progress.bonusXp || 0) + n;
+      saveProgress(reason);
+    },
+    getExt,
+    setExt,
+    registerTab: registerFeatureTab,
+    isSignedIn: () => Boolean(authState.user),
+    getUser: () => authState.user,
+    openAuthModal: () => openAuthModal(),
+    get aiStatus() { return state.aiStatus; },
+    on(name, fn) { const h = (e) => fn(e.detail || {}); coreBus.addEventListener(name, h); return () => coreBus.removeEventListener(name, h); },
+    emit: emitCore,
+    /** POST JSON to a same-origin API; returns { ok, status, data } and handles AUTH/RATE errors uniformly */
+    async api(path, body, method = 'POST') {
+      try {
+        const res = await fetch(path, {
+          method,
+          headers: body ? { 'Content-Type': 'application/json' } : undefined,
+          credentials: 'same-origin',
+          body: body ? JSON.stringify(body) : undefined
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data && data.usage) state.aiUsage = data.usage;
+        return { ok: res.ok && data.ok !== false, status: res.status, data };
+      } catch (err) {
+        return { ok: false, status: 0, data: { error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (ออฟไลน์?)' } };
+      }
+    }
+  };
+  // Load feature plugins lazily as a separate chunk
+  import('./features/index.js')
+    .then(() => emitCore('features-ready', {}))
+    .catch(err => console.error('[features] failed to load', err));
 
   // ---- NETLIFY IDENTITY + POSTGRES CLOUD SYNC ----
 

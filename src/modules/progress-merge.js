@@ -80,5 +80,8 @@ export function mergeCloudProgressData(localP, cloudP) {
   merged.vocabRainBest = Math.max(localP.vocabRainBest || 0, cloudP.vocabRainBest || 0);
   merged.vocabQuizCount = Math.max(localP.vocabQuizCount || 0, cloudP.vocabQuizCount || 0);
 
+  // Feature plugin namespaces: newest namespace object wins (by updatedAt)
+  merged.ext = mergeTimestampedMap(localP.ext || {}, cloudP.ext || {}, () => 0);
+
   return merged;
 }
