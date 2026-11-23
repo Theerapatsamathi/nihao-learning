@@ -9,7 +9,8 @@
     "build": "vite build",
     "test": "node --test",
     "preview": "vite preview",
-    "dev:local": "node tools/server.cjs"
+    "dev:local": "node tools/server.cjs",
+    "start:gcp": "node gcp/server.mjs"
   },
   "dependencies": {
     "@google/genai": "^3.6.1",
