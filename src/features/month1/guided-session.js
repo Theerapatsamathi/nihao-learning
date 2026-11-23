@@ -2,7 +2,7 @@
 import { buildGuidedSession, getTodayBlueprintDay } from './logic.js';
 
 const BEGINNER_TABS = new Set([
-  'month1', 'copybook', 'plan', 'initials', 'finals', 'tones', 'writing', 'vocab', 'speak-studio', 'settings-plus'
+  'month1', 'copybook', 'arena', 'plan', 'initials', 'finals', 'tones', 'writing', 'vocab', 'speak-studio', 'settings-plus'
 ]);
 
 export function applyBeginnerMode(core) {

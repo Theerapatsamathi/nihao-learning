@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GoogleGenAI, Type } from '@google/genai';
-import { firestoreGet, firestoreSet, synthesizeCloudTts } from './gcp-services.mjs';
+import { firestoreGet, firestoreSet, firestoreList, synthesizeCloudTts } from './gcp-services.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -27,6 +27,9 @@ const progressStore = new Map();
 const aiUsageStore = new Map();
 const leagueStore = new Map();
 const friendsStore = new Map();
+const arenaRoomsStore = new Map();
+const arenaSquadsStore = new Map();
+const arenaFeedStore = [];
 const ttsCache = new Map();
 
 function isAiConfigured() {
@@ -257,6 +260,183 @@ async function handleApi(req, res, urlObj) {
       if (body.code) list.push({ code: String(body.code).slice(0, 20), addedAt: new Date().toISOString() });
       friendsStore.set(userId, list.slice(-50));
       return sendJson(res, 200, { ok: true, friends: list });
+    }
+    return sendJson(res, 405, { ok: false, error: 'Method not allowed' });
+  }
+
+  // ---- Multiplayer Arena & Live Social APIs (Firestore + memory cache) ----
+  if (p === '/api/arena/leaderboard') {
+    const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
+    if (req.method === 'GET') {
+      const remote = await firestoreList('nihao_arena_lb', 60);
+      for (const r of remote) { if (r && r.userId) leagueStore.set(r.userId, r); }
+      const sortBy = String(urlObj.searchParams.get('sort') || 'weeklyXp');
+      const key = ['weeklyXp', 'totalXp', 'streak', 'speedBest'].includes(sortBy) ? sortBy : 'weeklyXp';
+      const rows = [...leagueStore.values()].sort((a, b) => (Number(b[key] || 0) - Number(a[key] || 0))).slice(0, 50);
+      return sendJson(res, 200, { ok: true, sort: key, players: rows });
+    }
+    if (req.method === 'POST') {
+      const body = await readJsonBody(req);
+      if (body.cheerTarget) {
+        const targetId = String(body.cheerTarget).slice(0, 80);
+        const cur = leagueStore.get(targetId) || (await firestoreGet('nihao_arena_lb', targetId.replace(/[^a-zA-Z0-9_-]/g, '_')));
+        if (cur) {
+          cur.cheers = (Number(cur.cheers) || 0) + 1;
+          leagueStore.set(targetId, cur);
+          await firestoreSet('nihao_arena_lb', targetId.replace(/[^a-zA-Z0-9_-]/g, '_'), cur);
+        }
+        return sendJson(res, 200, { ok: true });
+      }
+      const prev = leagueStore.get(userId) || {};
+      const rec = {
+        userId,
+        name: String(body.name || prev.name || 'ผู้เรียน').slice(0, 36),
+        avatar: String(body.avatar || prev.avatar || '🐼').slice(0, 8),
+        title: String(body.title || prev.title || 'ผู้เริ่มต้น').slice(0, 36),
+        weeklyXp: Math.max(0, Number(body.weeklyXp ?? prev.weeklyXp ?? 0)),
+        totalXp: Math.max(0, Number(body.totalXp ?? prev.totalXp ?? 0)),
+        streak: Math.max(0, Number(body.streak ?? prev.streak ?? 0)),
+        speedBest: Math.max(0, Number(body.speedBest ?? prev.speedBest ?? 0)),
+        cheers: Number(prev.cheers || 0),
+        updatedAt: new Date().toISOString()
+      };
+      leagueStore.set(userId, rec);
+      await firestoreSet('nihao_arena_lb', safeId, rec);
+      return sendJson(res, 200, { ok: true, player: rec });
+    }
+    return sendJson(res, 405, { ok: false, error: 'Method not allowed' });
+  }
+
+  if (p === '/api/arena/rooms' && req.method === 'POST') {
+    const body = await readJsonBody(req);
+    const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const room = {
+      code,
+      topic: String(body.topic || 'vocab').slice(0, 24),
+      seed: Math.floor(Math.random() * 999999),
+      hostName: String(body.name || 'Host').slice(0, 36),
+      createdAt: new Date().toISOString(),
+      players: {
+        [userId]: {
+          userId,
+          name: String(body.name || 'Host').slice(0, 36),
+          avatar: String(body.avatar || '🐼').slice(0, 8),
+          score: 0,
+          progress: 0,
+          done: false
+        }
+      }
+    };
+    arenaRoomsStore.set(code, room);
+    await firestoreSet('nihao_arena_rooms', code, room);
+    return sendJson(res, 200, { ok: true, room });
+  }
+
+  if (p.startsWith('/api/arena/rooms/')) {
+    const parts = p.split('/').filter(Boolean); // ['api','arena','rooms', CODE, 'score'?]
+    const code = String(parts[3] || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    if (!code) return sendJson(res, 400, { ok: false, error: 'Invalid room code' });
+    let room = arenaRoomsStore.get(code) || (await firestoreGet('nihao_arena_rooms', code));
+    if (!room) return sendJson(res, 404, { ok: false, error: 'ไม่พบห้องแข่งรหัสนี้' });
+    arenaRoomsStore.set(code, room);
+
+    if (req.method === 'GET') {
+      return sendJson(res, 200, { ok: true, room });
+    }
+    if (req.method === 'POST' && parts[4] === 'score') {
+      const body = await readJsonBody(req);
+      if (!room.players) room.players = {};
+      room.players[userId] = {
+        userId,
+        name: String(body.name || 'ผู้เล่น').slice(0, 36),
+        avatar: String(body.avatar || '🐼').slice(0, 8),
+        score: Math.max(0, Number(body.score || 0)),
+        progress: Math.max(0, Number(body.progress || 0)),
+        done: Boolean(body.done),
+        updatedAt: new Date().toISOString()
+      };
+      arenaRoomsStore.set(code, room);
+      await firestoreSet('nihao_arena_rooms', code, room);
+      return sendJson(res, 200, { ok: true, room });
+    }
+    return sendJson(res, 405, { ok: false, error: 'Method not allowed' });
+  }
+
+  if (p === '/api/arena/squads') {
+    if (req.method === 'GET') {
+      const code = String(urlObj.searchParams.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+      if (!code) return sendJson(res, 400, { ok: false, error: 'Missing squad code' });
+      const squad = arenaSquadsStore.get(code) || (await firestoreGet('nihao_arena_squads', code));
+      if (!squad) return sendJson(res, 404, { ok: false, error: 'ไม่พบกลุ่มเรียนรหัสนี้' });
+      arenaSquadsStore.set(code, squad);
+      return sendJson(res, 200, { ok: true, squad });
+    }
+    if (req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const action = String(body.action || 'create');
+      if (action === 'create') {
+        const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+        const squad = {
+          code,
+          name: String(body.squadName || 'แก๊งเรียนจีน').slice(0, 40),
+          goalXp: 2000,
+          members: {
+            [userId]: {
+              userId,
+              name: String(body.name || 'หัวหน้ากลุ่ม').slice(0, 36),
+              avatar: String(body.avatar || '🐼').slice(0, 8),
+              weeklyXp: Math.max(0, Number(body.weeklyXp || 0))
+            }
+          }
+        };
+        arenaSquadsStore.set(code, squad);
+        await firestoreSet('nihao_arena_squads', code, squad);
+        return sendJson(res, 200, { ok: true, squad });
+      }
+      const code = String(body.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+      const squad = arenaSquadsStore.get(code) || (await firestoreGet('nihao_arena_squads', code));
+      if (!squad) return sendJson(res, 404, { ok: false, error: 'ไม่พบกลุ่มเรียนรหัสนี้' });
+      if (!squad.members) squad.members = {};
+      squad.members[userId] = {
+        userId,
+        name: String(body.name || 'สมาชิก').slice(0, 36),
+        avatar: String(body.avatar || '🐼').slice(0, 8),
+        weeklyXp: Math.max(0, Number(body.weeklyXp || 0))
+      };
+      arenaSquadsStore.set(code, squad);
+      await firestoreSet('nihao_arena_squads', code, squad);
+      return sendJson(res, 200, { ok: true, squad });
+    }
+    return sendJson(res, 405, { ok: false, error: 'Method not allowed' });
+  }
+
+  if (p === '/api/arena/feed') {
+    if (req.method === 'GET') {
+      const remote = await firestoreGet('nihao_arena_feed', 'latest');
+      const items = Array.isArray(remote?.items) ? remote.items : arenaFeedStore;
+      return sendJson(res, 200, { ok: true, items: items.slice(0, 25) });
+    }
+    if (req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const remote = await firestoreGet('nihao_arena_feed', 'latest');
+      const items = Array.isArray(remote?.items) ? remote.items : [...arenaFeedStore];
+      if (body.reactId) {
+        const hit = items.find(x => x.id === body.reactId);
+        if (hit) hit.claps = (Number(hit.claps) || 0) + 1;
+      } else if (body.text) {
+        items.unshift({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: String(body.name || 'ผู้เรียน').slice(0, 36),
+          avatar: String(body.avatar || '🐼').slice(0, 8),
+          text: String(body.text).slice(0, 140),
+          claps: 0,
+          at: new Date().toISOString()
+        });
+      }
+      const trimmed = items.slice(0, 25);
+      arenaFeedStore.splice(0, arenaFeedStore.length, ...trimmed);
+      await firestoreSet('nihao_arena_feed', 'latest', { items: trimmed });
+      return sendJson(res, 200, { ok: true, items: trimmed });
     }
     return sendJson(res, 405, { ok: false, error: 'Method not allowed' });
   }

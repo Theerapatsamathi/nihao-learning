@@ -92,3 +92,27 @@ export async function synthesizeCloudTts(text, lang = 'zh-CN') {
     return null;
   }
 }
+
+export async function firestoreList(collection, pageSize = 50) {
+  const project = getProjectId();
+  if (!project) return [];
+  const token = await getGcpAccessToken();
+  if (!token) return [];
+  const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(project)}/databases/(default)/documents/${encodeURIComponent(collection)}?pageSize=${pageSize}`;
+  try {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(3500) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const docs = Array.isArray(data.documents) ? data.documents : [];
+    const out = [];
+    for (const d of docs) {
+      const jsonStr = d?.fields?.payload?.stringValue;
+      if (jsonStr) {
+        try { out.push(JSON.parse(jsonStr)); } catch { /* ignore */ }
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
