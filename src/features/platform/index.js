@@ -7,10 +7,13 @@ import { initReminders } from './reminders.js';
 import { initOfflinePack } from './offline-pack.js';
 import { initWordOfTheDay } from './wotd.js';
 import { collectWhatsNewTabs } from './whats-new.js';
+import { initLanguageSwitcher, initFirebaseGoogleAuth } from './i18n-firebase-auth.js';
 
 const core = window.NihaoCore;
 
 if (core) {
+  initLanguageSwitcher(core);
+  initFirebaseGoogleAuth(core);
   const displayCtrl = initDisplayMode(core);
   const hapticsCtrl = initHapticsSfx(core);
   const remindersCtrl = initReminders(core);
