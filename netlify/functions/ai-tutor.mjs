@@ -46,6 +46,35 @@ const PRONUNCIATION_RESPONSE_SCHEMA = {
   required: ["score", "summary", "mouthTip", "drill"]
 };
 
+const XRAY_RESPONSE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    sentence: { type: Type.STRING, description: "Clean Simplified Chinese sentence." },
+    pinyin: { type: Type.STRING, description: "Full tone-marked Pinyin for the sentence." },
+    translation: { type: Type.STRING, description: "Natural Thai translation." },
+    pattern: { type: Type.STRING, description: "Reusable grammar pattern template (e.g. S + 把 + O + V + 了)." },
+    tokens: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          hz: { type: Type.STRING, description: "Chinese word/chunk." },
+          py: { type: Type.STRING, description: "Tone-marked Pinyin." },
+          pos: { type: Type.STRING, description: "Short Thai part-of-speech label (e.g. ประธาน, กริยา, คำช่วย, คำนาม)." },
+          th: { type: Type.STRING, description: "Concise Thai meaning of this word in context." }
+        },
+        required: ["hz", "py", "pos", "th"]
+      }
+    },
+    grammarNotes: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "1 to 3 concise Thai grammar notes explaining particles, word order, or nuances."
+    }
+  },
+  required: ["sentence", "pinyin", "translation", "pattern", "tokens", "grammarNotes"]
+};
+
 const BASE_SYSTEM_INSTRUCTION =
   "You are a warm, encouraging Mandarin Chinese tutor for Thai beginners (HSK 1-2). " +
   "Remember the conversation context and respond naturally in simple Simplified Chinese (1-2 short sentences). " +
@@ -143,6 +172,32 @@ export default async (req) => {
 
       return Response.json(
         { ok: true, model, usage: gate.usage, coaching },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    // Mode 1.5: AI Sentence X-Ray (word-by-word grammar breakdown)
+    if (body?.mode === "xray") {
+      const sentence = String(body?.sentence || "").trim().slice(0, 180);
+      if (!sentence) {
+        return Response.json({ ok: false, error: "กรุณาพิมพ์หรือวางประโยคภาษาจีนที่ต้องการผ่าโครงสร้าง" }, { status: 400 });
+      }
+
+      const xrayInstruction =
+        "You are an expert Mandarin Chinese grammar teacher for Thai learners. " +
+        "Break down the given Chinese sentence word-by-word into meaningful tokens with tone-marked Pinyin, " +
+        "a concise Thai part-of-speech label, and contextual Thai meaning. " +
+        "Highlight key Chinese grammar points (e.g. 把, 了, 过, 的/得/地, measure words, word order) in 1-3 crisp Thai bullet points.";
+
+      const { data: xray, model } = await generateStructuredJson({
+        contents: `ผ่าโครงสร้างประโยคภาษาจีนนี้สำหรับคนไทย: "${sentence}"`,
+        systemInstruction: xrayInstruction,
+        responseSchema: XRAY_RESPONSE_SCHEMA,
+        validate: (x) => Boolean(x && typeof x === "object" && Array.isArray(x.tokens) && x.tokens.length > 0)
+      });
+
+      return Response.json(
+        { ok: true, model, usage: gate.usage, xray },
         { headers: { "Cache-Control": "no-store" } }
       );
     }

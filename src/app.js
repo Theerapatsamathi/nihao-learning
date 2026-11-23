@@ -1,4 +1,6 @@
 import * as NetlifyAuthMod from '@netlify/identity';
+import { computeNextSm2, computeSrsRetention } from './modules/srs-sm2.js';
+import { mergeCloudProgressData } from './modules/progress-merge.js';
 if (typeof window !== 'undefined') {
   window.NetlifyAuth = NetlifyAuthMod;
 }
@@ -3943,14 +3945,21 @@ if (typeof window !== 'undefined') {
             ` : `<div class="vsrs-fc-hint">แตะการ์ดเพื่อเฉลยพินอินและคำแปลไทย</div>`}
           </div>
 
-          ${sess.flipped ? `
+          ${sess.flipped ? (() => {
+            const curSrs = srsMap[activeWord.id];
+            const tk = todayKey();
+            const dHard = computeNextSm2(curSrs, 'hard', tk).interval;
+            const dGood = computeNextSm2(curSrs, 'good', tk).interval;
+            const dEasy = computeNextSm2(curSrs, 'easy', tk).interval;
+            return `
             <div class="vsrs-rate-bar">
               <button type="button" class="vsrs-rate-btn r-again" data-rate="again"><b>ลืมแล้ว</b><small>[1] ทวนซ้ำวันนี้</small></button>
-              <button type="button" class="vsrs-rate-btn r-hard" data-rate="hard"><b>จำไม่ค่อยแม่น</b><small>[2] +1 วัน</small></button>
-              <button type="button" class="vsrs-rate-btn r-good" data-rate="good"><b>จำได้</b><small>[3] +${SRS_INTERVALS[Math.min(4, ((srsMap[activeWord.id]?.step || 0) + 1))]} วัน</small></button>
-              <button type="button" class="vsrs-rate-btn r-easy" data-rate="easy"><b>ง่ายมาก!</b><small>[4] +${SRS_INTERVALS[Math.min(4, ((srsMap[activeWord.id]?.step || 0) + 2))]} วัน</small></button>
+              <button type="button" class="vsrs-rate-btn r-hard" data-rate="hard"><b>จำไม่ค่อยแม่น</b><small>[2] +${dHard} วัน</small></button>
+              <button type="button" class="vsrs-rate-btn r-good" data-rate="good"><b>จำได้</b><small>[3] +${dGood} วัน</small></button>
+              <button type="button" class="vsrs-rate-btn r-easy" data-rate="easy"><b>ง่ายมาก!</b><small>[4] +${dEasy} วัน</small></button>
             </div>
-          ` : `
+            `;
+          })() : `
             <div style="text-align:center;margin-top:12px">
               <button type="button" class="btn-primary" id="vsrs-flip-btn">พลิกดูเฉลย →</button>
             </div>
@@ -3992,25 +4001,12 @@ if (typeof window !== 'undefined') {
       btn.addEventListener('click', () => {
         if (!activeWord) return;
         const rate = btn.dataset.rate;
-        const entry = srsMap[activeWord.id] || { step: 0, nextDue: todayKey(), reviews: 0 };
         const tk = todayKey();
+        const nextEntry = computeNextSm2(srsMap[activeWord.id], rate, tk);
         if (rate === 'again') {
-          entry.step = 0;
-          entry.nextDue = tk;
           sess.queue.push(activeWord); // re-queue in current session
-        } else if (rate === 'hard') {
-          entry.step = Math.max(0, entry.step);
-          entry.nextDue = addDaysToKey(tk, 1);
-        } else if (rate === 'good') {
-          entry.step = Math.min(4, entry.step + 1);
-          entry.nextDue = addDaysToKey(tk, SRS_INTERVALS[entry.step]);
-        } else {
-          entry.step = Math.min(4, entry.step + 2);
-          entry.nextDue = addDaysToKey(tk, SRS_INTERVALS[entry.step]);
         }
-        entry.reviews = (entry.reviews || 0) + 1;
-        entry.updatedAt = Date.now();
-        srsMap[activeWord.id] = entry;
+        srsMap[activeWord.id] = nextEntry;
         state.progress.bonusXp = (state.progress.bonusXp || 0) + 4;
         sess.doneCount++;
         sess.idx++;
@@ -5875,6 +5871,65 @@ if (typeof window !== 'undefined') {
           </div>
         </div>
 
+        <!-- Weekly Learning Insights (7-Day Chart + Retention + Weak Words) -->
+        ${(() => {
+          const days7 = [];
+          let maxAct = 1;
+          let activeDays = 0;
+          let totalUnits7 = 0;
+          const thDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+          for (let i = 6; i >= 0; i--) {
+            const k = todayKey(-i);
+            const v = Number(p.activity?.[k] || 0);
+            const dt = new Date(k + 'T00:00:00');
+            if (v > 0) activeDays++;
+            totalUnits7 += v;
+            if (v > maxAct) maxAct = v;
+            days7.push({ key: k, label: thDays[dt.getDay()], val: v, isToday: i === 0 });
+          }
+          const ret = computeSrsRetention(p.vocabSrs);
+          const weakWords = (Array.isArray(p.vocabMistakes) ? p.vocabMistakes : []).slice(0, 5);
+          return `
+            <div class="card-panel">
+              <div class="section-row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
+                <div>
+                  <h2 class="section-subtitle">📊 สรุปการเรียน 7 วันล่าสุด (Weekly Insights)</h2>
+                  <p class="section-subdesc">ติดตามความสม่ำเสมอ อัตราจำแม่น SM-2 และจุดอ่อนที่ควรติวซ้ำ</p>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <span class="shop-price tabular-nums">เข้าเรียน ${activeDays}/7 วัน</span>
+                  <span class="shop-price tabular-nums">${ret.retentionPct !== null ? `จำแม่น ${ret.retentionPct}%` : `กำลังสะสม SRS (${ret.totalTracked} คำ)`}</span>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;height:110px;padding:10px 6px 4px;border-radius:12px;background:var(--sys-fill-2)">
+                ${days7.map(d => {
+                  const h = d.val > 0 ? Math.max(14, Math.round((d.val / maxAct) * 76)) : 6;
+                  return `
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+                      <span class="tabular-nums" style="font-size:11px;color:var(--sys-label-2)">${d.val || ''}</span>
+                      <div style="width:100%;max-width:34px;height:${h}px;border-radius:8px;background:${d.isToday ? 'var(--sys-accent)' : d.val > 0 ? 'var(--sys-green, #34c759)' : 'var(--sys-separator)'};opacity:${d.val > 0 ? 1 : 0.45}"></div>
+                      <span style="font-size:11.5px;font-weight:${d.isToday ? 700 : 500};color:${d.isToday ? 'var(--sys-accent-text)' : 'var(--sys-label-2)'}">${d.label}</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:12px;font-size:13px">
+                <div>
+                  <b>กิจกรรมรวมสัปดาห์นี้:</b> <span class="tabular-nums">${totalUnits7}</span> ครั้ง · <b>คำที่จำแม่น (SM-2):</b> <span class="tabular-nums">${ret.mastered}</span> คำ
+                </div>
+                ${weakWords.length > 0 ? `
+                  <button type="button" class="btn-primary" id="profile-drill-weak-btn" style="padding:5px 12px;font-size:12.5px">⚡ ติวด่วนคำที่ผิดบ่อย (${weakWords.length} คำ)</button>
+                ` : ''}
+              </div>
+              ${weakWords.length > 0 ? `
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+                  ${weakWords.map(w => `<span class="vtab-pill" style="padding:3px 9px;font-size:12.5px" title="${escapeHtml((w.pinyin || '') + ' · ' + (w.meaning || ''))}">${escapeHtml(w.hanzi)} <small style="opacity:0.75">${escapeHtml(w.pinyin || '')}</small></span>`).join('')}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        })()}
+
         <!-- Panda Shop (Bamboo Coins & Accessories) -->
         <div class="card-panel">
           <div class="section-row" style="margin-bottom:12px">
@@ -5963,6 +6018,16 @@ if (typeof window !== 'undefined') {
         saveProgress(`ภารกิจสำเร็จ: ${q.title}`);
         renderProfilePage();
       });
+    });
+
+    document.getElementById('profile-drill-weak-btn')?.addEventListener('click', () => {
+      const weak = (Array.isArray(state.progress.vocabMistakes) ? state.progress.vocabMistakes : []).slice(0, 15);
+      if (!weak.length) return;
+      state.vocabMode = 'srs';
+      state.vocabSrsSession = { queue: weak, idx: 0, flipped: false, doneCount: 0, earlyMode: true };
+      switchTab('vocab');
+      renderVocab();
+      showToast(`เริ่มติวด่วน ${weak.length} คำที่ผิดบ่อย!`, 'DRILL');
     });
 
     document.getElementById('buy-streak-freeze-btn')?.addEventListener('click', () => {
@@ -7550,6 +7615,53 @@ if (typeof window !== 'undefined') {
           <button type="submit" class="btn-primary" ${state.tutorBusy ? 'disabled' : ''}>${state.tutorBusy ? '...' : 'ส่ง'}</button>
         </form>
       </div>
+
+      <!-- AI Sentence X-Ray (Grammar & Word-by-Word Breakdown) -->
+      <div class="card-panel" style="margin-top:14px">
+        <div class="section-row" style="margin-bottom:8px;flex-wrap:wrap;gap:6px">
+          <div>
+            <h2 class="section-subtitle" style="margin:0">🔍 ผ่าประโยค & ไวยากรณ์จีน (AI Sentence X-Ray)</h2>
+            <p class="section-subdesc" style="margin:2px 0 0">วางประโยคจีนจากซีรีส์/TikTok/บทเรียน เพื่อแยกคำศัพท์ หน้าที่คำ และโครงสร้างไวยากรณ์แบบคนไทยเข้าใจง่าย</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          ${['我把作业做完了。', '他跑得很快。', '我去过中国两次。', '虽然很累，但是我很开心。'].map(ex => `
+            <button type="button" class="btn-secondary" data-xray-sample="${escapeHtml(ex)}" style="font-size:12px;padding:3px 9px">${escapeHtml(ex)}</button>
+          `).join('')}
+        </div>
+        <form class="tutor-input-row" id="xray-form">
+          <input type="text" class="sys-input" id="xray-input" maxlength="180" value="${escapeHtml(state.xrayQuery || '')}" placeholder="วางประโยคภาษาจีนที่ต้องการผ่าโครงสร้าง..." autocomplete="off" ${state.xrayBusy ? 'disabled' : ''}>
+          <button type="submit" class="btn-primary" ${state.xrayBusy ? 'disabled' : ''}>${state.xrayBusy ? 'กำลังผ่า...' : '🔍 ผ่าประโยค'}</button>
+        </form>
+        ${state.xrayResult ? `
+          <div style="margin-top:12px;padding:12px;border-radius:12px;background:var(--sys-fill-2)">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+              <div>
+                <div class="hanzi-font" style="font-size:20px;font-weight:700">${escapeHtml(state.xrayResult.sentence)}</div>
+                <div style="font-size:13px;color:var(--sys-accent-text)">${escapeHtml(state.xrayResult.pinyin)}</div>
+                <div style="font-size:14px;color:var(--sys-label-2);margin-top:2px">${escapeHtml(state.xrayResult.translation)}</div>
+              </div>
+              <button type="button" class="btn-secondary" data-speak="${escapeHtml(state.xrayResult.sentence)}">🔊 ฟังทั้งประโยค</button>
+            </div>
+            ${state.xrayResult.pattern ? `<div style="margin-top:8px;font-size:12.5px;padding:6px 10px;border-radius:8px;background:var(--sys-bg)"><b>📐 โครงสร้าง:</b> ${escapeHtml(state.xrayResult.pattern)}</div>` : ''}
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+              ${(state.xrayResult.tokens || []).map(t => `
+                <button type="button" data-speak="${escapeHtml(t.hz)}" style="text-align:left;padding:8px 10px;border-radius:10px;border:1px solid var(--sys-separator);background:var(--sys-bg);cursor:pointer;min-width:86px">
+                  <div class="hanzi-font" style="font-size:17px;font-weight:700">${escapeHtml(t.hz)}</div>
+                  <div style="font-size:11.5px;color:var(--sys-accent-text)">${escapeHtml(t.py)}</div>
+                  <div style="font-size:11px;color:var(--sys-label-3)">${escapeHtml(t.pos)}</div>
+                  <div style="font-size:12px;color:var(--sys-label-2);margin-top:2px">${escapeHtml(t.th)}</div>
+                </button>
+              `).join('')}
+            </div>
+            ${Array.isArray(state.xrayResult.grammarNotes) && state.xrayResult.grammarNotes.length ? `
+              <ul style="margin:10px 0 0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--sys-label-2)">
+                ${state.xrayResult.grammarNotes.map(n => `<li>${escapeHtml(n)}</li>`).join('')}
+              </ul>
+            ` : ''}
+          </div>
+        ` : ''}
+      </div>
     `;
 
     const msgBox = document.getElementById('tutor-messages');
@@ -7637,6 +7749,48 @@ if (typeof window !== 'undefined') {
 
     host.querySelectorAll('[data-speak]').forEach(b => b.addEventListener('click', () => speak(b.dataset.speak)));
     host.querySelectorAll('[data-tquick]').forEach(b => b.addEventListener('click', () => sendUserMsg(b.dataset.tquick)));
+
+    const runSentenceXray = async (rawSentence) => {
+      const sentence = String(rawSentence || '').trim().slice(0, 180);
+      if (!sentence || state.xrayBusy) return;
+      if (!authState.user) {
+        showToast('กรุณาเข้าสู่ระบบก่อนใช้งาน AI ผ่าประโยค', 'LOGIN');
+        openAuthModal();
+        return;
+      }
+      state.xrayQuery = sentence;
+      state.xrayBusy = true;
+      renderTutorPage();
+      try {
+        const res = await fetch('/api/ai/tutor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ mode: 'xray', sentence })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.usage) state.aiUsage = data.usage;
+        if (!res.ok || !data.xray) throw new Error(data.error || 'ไม่สามารถผ่าประโยคได้ชั่วคราว');
+        state.xrayResult = data.xray;
+        state.progress.bonusXp = (state.progress.bonusXp || 0) + 5;
+        saveProgress('ผ่าประโยคด้วย AI X-Ray');
+      } catch (err) {
+        playChime('err');
+        showToast(err.message || 'ครู AI ไม่พร้อมใช้งานชั่วคราว', 'AI');
+      } finally {
+        state.xrayBusy = false;
+        renderTutorPage();
+      }
+    };
+
+    host.querySelectorAll('[data-xray-sample]').forEach(btn => {
+      btn.addEventListener('click', () => runSentenceXray(btn.dataset.xraySample));
+    });
+    document.getElementById('xray-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const inp = document.getElementById('xray-input');
+      runSentenceXray(inp?.value || '');
+    });
     document.getElementById('tutor-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const inp = document.getElementById('tutor-input');
@@ -8260,82 +8414,8 @@ if (typeof window !== 'undefined') {
     );
   }
 
-  function mergeTimestampedMap(localMap, cloudMap, fallbackScore) {
-    const out = {};
-    const keys = new Set([
-      ...Object.keys(localMap || {}),
-      ...Object.keys(cloudMap || {})
-    ]);
-    for (const k of keys) {
-      const a = localMap ? localMap[k] : null;
-      const b = cloudMap ? cloudMap[k] : null;
-      if (!a) { out[k] = b; continue; }
-      if (!b) { out[k] = a; continue; }
-      const tsA = Number(a.updatedAt || 0);
-      const tsB = Number(b.updatedAt || 0);
-      if (tsA !== tsB) {
-        out[k] = tsA > tsB ? a : b;
-      } else {
-        out[k] = fallbackScore(a) >= fallbackScore(b) ? a : b;
-      }
-    }
-    return out;
-  }
-
-  function mergeMaxNumMap(localMap, cloudMap) {
-    const out = {};
-    const keys = new Set([
-      ...Object.keys(localMap || {}),
-      ...Object.keys(cloudMap || {})
-    ]);
-    for (const k of keys) {
-      out[k] = Math.max(Number(localMap?.[k] || 0), Number(cloudMap?.[k] || 0));
-    }
-    return out;
-  }
-
   function mergeCloudProgress(localP, cloudP) {
-    if (!cloudP || typeof cloudP !== 'object') return localP;
-    const merged = { ...localP, ...cloudP };
-    const uniqArr = (a, b) => [...new Set([...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])])];
-    merged.initials = uniqArr(localP.initials, cloudP.initials);
-    merged.finals = uniqArr(localP.finals, cloudP.finals);
-    merged.writing = uniqArr(localP.writing, cloudP.writing);
-    merged.vocabStarred = uniqArr(localP.vocabStarred, cloudP.vocabStarred);
-    merged.ownedItems = uniqArr(localP.ownedItems, cloudP.ownedItems);
-    merged.frozenDays = uniqArr(localP.frozenDays, cloudP.frozenDays);
-    merged.streakFreezes = Math.max(localP.streakFreezes || 0, cloudP.streakFreezes || 0);
-
-    // Keep earliest learned date per vocab ID
-    const learnedOut = { ...(localP.vocabLearned || {}) };
-    for (const [k, v] of Object.entries(cloudP.vocabLearned || {})) {
-      if (!learnedOut[k] || (v && v < learnedOut[k])) learnedOut[k] = v;
-    }
-    merged.vocabLearned = learnedOut;
-
-    // Pick newer SRS record per word based on updatedAt (fallback to review count)
-    merged.vocabSrs = mergeTimestampedMap(
-      localP.vocabSrs,
-      cloudP.vocabSrs,
-      (x) => (Number(x.reviews || 0) * 10) + Number(x.step || 0)
-    );
-    merged.srs = mergeTimestampedMap(
-      localP.srs,
-      cloudP.srs,
-      (x) => (Number(x.reps || 0) * 10) + Number(x.interval || 0)
-    );
-
-    merged.vocabNotes = { ...(localP.vocabNotes || {}), ...(cloudP.vocabNotes || {}) };
-    merged.dayScores = mergeMaxNumMap(localP.dayScores, cloudP.dayScores);
-    merged.activity = mergeMaxNumMap(localP.activity, cloudP.activity);
-    merged.bonusXp = Math.max(localP.bonusXp || 0, cloudP.bonusXp || 0);
-    merged.drillCorrect = Math.max(localP.drillCorrect || 0, cloudP.drillCorrect || 0);
-    merged.bestQuiz = Math.max(localP.bestQuiz || 0, cloudP.bestQuiz || 0) || null;
-    merged.speedBest = Math.max(localP.speedBest || 0, cloudP.speedBest || 0);
-    merged.rainBest = Math.max(localP.rainBest || 0, cloudP.rainBest || 0);
-    merged.vocabMatchBest = Math.max(localP.vocabMatchBest || 0, cloudP.vocabMatchBest || 0);
-    merged.vocabRainBest = Math.max(localP.vocabRainBest || 0, cloudP.vocabRainBest || 0);
-    merged.vocabQuizCount = Math.max(localP.vocabQuizCount || 0, cloudP.vocabQuizCount || 0);
+    const merged = mergeCloudProgressData(localP, cloudP);
     ensureTodayDaily(merged);
     return merged;
   }
