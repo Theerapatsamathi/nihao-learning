@@ -1,9 +1,7 @@
-const CACHE_NAME = 'nihao-cache-v18';
+const CACHE_NAME = 'nihao-cache-v19';
 const CORE_ASSETS = [
   '/',
   '/index.html',
-  '/styles.css',
-  '/app.js',
   '/manifest.json',
   '/icon.svg',
   '/vendor/hanzi-writer.min.js',
@@ -17,7 +15,7 @@ const CORE_ASSETS = [
   '/data/fun-pack-data.js'
 ];
 
-// Trusted external origins to cache for offline character strokes & auth client
+// Trusted external origins to cache for offline character strokes
 const CACHEABLE_EXTERNAL_ORIGINS = new Set([
   'https://cdn.jsdelivr.net',
   'https://esm.sh'
@@ -48,9 +46,9 @@ self.addEventListener('fetch', (event) => {
   const isCacheableExternal = CACHEABLE_EXTERNAL_ORIGINS.has(url.origin);
   if (!isSameOrigin && !isCacheableExternal) return;
 
-  // Cache-first for immutable vendored libs & external stroke data JSONs
+  // Cache-first for immutable Vite hashed bundles, vendored libs, and stroke JSONs
   if (
-    (isSameOrigin && url.pathname.startsWith('/vendor/')) ||
+    (isSameOrigin && (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/vendor/'))) ||
     (isCacheableExternal && url.hostname === 'cdn.jsdelivr.net')
   ) {
     event.respondWith(
@@ -68,7 +66,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first with cache fallback for app shell, data packs, and pinned ESM modules
+  // Network-first with cache fallback for HTML & data packs
   event.respondWith(
     fetch(event.request)
       .then((res) => {

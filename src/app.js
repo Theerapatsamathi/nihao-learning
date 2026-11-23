@@ -1,3 +1,8 @@
+import * as NetlifyAuthMod from '@netlify/identity';
+if (typeof window !== 'undefined') {
+  window.NetlifyAuth = NetlifyAuthMod;
+}
+
 (() => {
   const DATA = window.LEVEL1_DATA;
   const CHART = window.PINYIN_CHART_DATA;
@@ -401,7 +406,7 @@
     const key = `${lang}::${text}`;
     if (ttsBlobCache.has(key)) return ttsBlobCache.get(key);
     const url = `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text)}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { credentials: 'same-origin' });
     if (res.status === 501) {
       serverTtsDisabled = true;
       throw new Error('TTS provider not configured');
@@ -1863,12 +1868,53 @@
           state.progress.drillCorrect++;
           saveProgress();
           fb.className = 'drill-feedback show ok';
-          fb.innerHTML = `<b>ยอดเยี่ยม! สำเนียงชัดเจนมาก ✓</b> ระบบจับคำว่า <b class="hanzi-font">${item.hanzi}</b> (${item.pinyin}) ได้ตรงเป๊ะ!`;
+          fb.innerHTML = `<b>ยอดเยี่ยม! สำเนียงชัดเจนมาก ✓</b> ระบบจับคำว่า <b class="hanzi-font">${item.hanzi}</b> (${item.pinyin}) ได้ตรงเป๊ะ! <div style="margin-top:8px"><button type="button" class="btn-secondary" id="sp-ai-coach-btn" style="font-size:12px;padding:4px 10px">🎙️ ให้ครู AI แนะนำวิธีออกเสียงให้เป๊ะขึ้น</button></div><div id="sp-ai-coach-box"></div>`;
         } else {
           state.drillStreak = 0;
           fb.className = 'drill-feedback show err';
-          fb.innerHTML = `<b>ยังคลาดเคลื่อนเล็กน้อย</b> ระบบได้ยิน "${escapeHtml(heard)}" — ลองกดฟังต้นฉบับแล้วเน้น "${escapeHtml(item.focus)}" อีกครั้งนะ`;
+          fb.innerHTML = `<b>ยังคลาดเคลื่อนเล็กน้อย</b> ระบบได้ยิน "${escapeHtml(heard)}" — ลองกดฟังต้นฉบับแล้วเน้น "${escapeHtml(item.focus)}" อีกครั้งนะ <div style="margin-top:8px"><button type="button" class="btn-primary" id="sp-ai-coach-btn" style="font-size:12px;padding:4px 10px">🎙️ ให้ครู AI วิเคราะห์จุดเพี้ยน & วิธีวางลิ้น</button></div><div id="sp-ai-coach-box"></div>`;
         }
+
+        document.getElementById('sp-ai-coach-btn')?.addEventListener('click', async () => {
+          const btn = document.getElementById('sp-ai-coach-btn');
+          const box = document.getElementById('sp-ai-coach-box');
+          if (!authState.user) {
+            showToast('กรุณาเข้าสู่ระบบก่อนใช้ครู AI วิเคราะห์การออกเสียง', 'LOGIN');
+            openAuthModal();
+            return;
+          }
+          if (btn) { btn.disabled = true; btn.textContent = 'กำลังวิเคราะห์สำเนียง...'; }
+          try {
+            const res = await fetch('/api/ai/tutor', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                mode: 'pronunciation',
+                targetHz: item.hanzi,
+                targetPy: item.pinyin,
+                heardHz: heard
+              })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (data.usage) state.aiUsage = data.usage;
+            if (!res.ok || !data.coaching) throw new Error(data.error || 'ไม่สามารถวิเคราะห์เสียงได้ชั่วคราว');
+            const c = data.coaching;
+            if (box) {
+              box.innerHTML = `
+                <div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--sys-fill-2);text-align:left;font-size:13px;line-height:1.55">
+                  <div><b>🎯 คะแนนความชัด: ${Number(c.score || 0)}/100</b> · ${escapeHtml(c.summary)}</div>
+                  <div style="margin-top:4px"><b>👅 วิธีวางลิ้น/วรรณยุกต์:</b> ${escapeHtml(c.mouthTip)}</div>
+                  ${c.drill ? `<div style="margin-top:4px;color:var(--sys-accent-text)"><b>🗣️ ซ้อมตามนี้:</b> ${escapeHtml(c.drill)}</div>` : ''}
+                </div>
+              `;
+            }
+            if (btn) btn.remove();
+          } catch (err) {
+            if (btn) { btn.disabled = false; btn.textContent = '🎙️ ลองวิเคราะห์อีกครั้ง'; }
+            showToast(err.message || 'ครู AI ไม่พร้อมใช้งานชั่วคราว', 'AI');
+          }
+        });
       };
 
       rec.onerror = (ev) => {
@@ -7384,6 +7430,59 @@
     return out;
   }
 
+  const TUTOR_SCENARIOS = [
+    {
+      id: '',
+      label: '💬 คุยอิสระ',
+      greeting: {
+        hz: '你好！我是你的中文老师。今天你想聊什么？',
+        py: 'Nǐ hǎo! Wǒ shì nǐ de Zhōngwén lǎoshī. Jīntiān nǐ xiǎng liáo shénme?',
+        th: 'สวัสดี! ฉันคือครูสอนภาษาจีนของคุณ วันนี้อยากคุยเรื่องอะไรดี?',
+        tip: 'ลองทักทายหรือถามอะไรก็ได้เป็นภาษาจีน พินอิน หรือภาษาไทย'
+      }
+    },
+    {
+      id: 'restaurant',
+      label: '🍜 สั่งอาหาร & ชานม',
+      greeting: {
+        hz: '欢迎光临！请问您想喝什么奶茶，还是想点菜？',
+        py: 'Huānyíng guānglín! Qǐngwèn nín xiǎng hē shénme nǎichá, háishi xiǎng diǎncài?',
+        th: 'ยินดีต้อนรับครับ! ไม่ทราบว่าอยากดื่มชานมอะไร หรืออยากสั่งอาหารดีครับ?',
+        tip: 'ลองตอบว่า "我要一杯珍珠奶茶，少糖少冰。" (ขอชานมไข่มุก 1 แก้ว หวานน้อย น้ำแข็งน้อย)'
+      }
+    },
+    {
+      id: 'shopping',
+      label: '🛍️ ต่อราคา & สแกนจ่าย',
+      greeting: {
+        hz: '你好！看看吧，这件衣服很好看，喜欢可以试一下！',
+        py: 'Nǐ hǎo! Kànkan ba, zhè jiàn yīfu hěn hǎokàn, xǐhuan kěyǐ shì yíxià!',
+        th: 'สวัสดีครับ! ลองดูได้เลย เสื้อตัวนี้สวยมาก ถ้าชอบลองใส่ได้นะครับ!',
+        tip: 'ลองถามราคาว่า "这个多少钱？可以便宜一点吗？" (อันนี้ราคาเท่าไร ลดหน่อยได้ไหม?)'
+      }
+    },
+    {
+      id: 'taxi',
+      label: '🚕 นั่งแท็กซี่ & ถามทาง',
+      greeting: {
+        hz: '你好！请问你要去哪里？',
+        py: 'Nǐ hǎo! Qǐngwèn nǐ yào qù nǎlǐ?',
+        th: 'สวัสดีครับ! ไม่ทราบว่าจะไปที่ไหนครับ?',
+        tip: 'ลองตอบว่า "我要去机场，大概需要多久？" (ฉันจะไปสนามบิน ใช้เวลาประมาณเท่าไร?)'
+      }
+    },
+    {
+      id: 'hotel',
+      label: '🏨 เช็คอินโรงแรม',
+      greeting: {
+        hz: '您好，欢迎入住！请问您有预订房间吗？请给我看一下护照。',
+        py: 'Nínhǎo, huānyíng rùzhù! Qǐngwèn nín yǒu yùdìng fángjiān ma? Qǐng gěi wǒ kàn yíxià hùzhào.',
+        th: 'สวัสดีครับ ยินดีต้อนรับเข้าพัก! ไม่ทราบว่าจองห้องไว้ไหมครับ ขอชมพาสปอร์ตหน่อยครับ',
+        tip: 'ลองตอบว่า "我有预订，这是我的护照。房间有Wi-Fi吗？" (ฉันจองไว้แล้ว นี่พาสปอร์ตค่ะ ห้องมี Wi-Fi ไหม?)'
+      }
+    }
+  ];
+
   function renderTutorPage() {
     const host = document.getElementById('tutor-content');
     if (!host) return;
@@ -7392,6 +7491,7 @@
     const aiLoggedIn = Boolean(authState.user);
     const quotaText = state.aiUsage ? ` · เหลือ ${state.aiUsage.remaining}/${state.aiUsage.limit} ครั้งวันนี้` : '';
     if (typeof state.tutorUseFocusWords !== 'boolean') state.tutorUseFocusWords = true;
+    if (typeof state.tutorScenario !== 'string') state.tutorScenario = '';
     const focusWords = getTutorFocusWords();
 
     host.innerHTML = `
@@ -7408,6 +7508,13 @@
             ${aiReady && !aiLoggedIn ? `<button type="button" class="btn-primary" id="tutor-login-btn" style="padding:4px 10px;font-size:12px">เข้าสู่ระบบ</button>` : ''}
           </div>
           <button type="button" class="btn-secondary" id="tutor-reset-chat">เริ่มบทสนทนาใหม่</button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--sys-separator)">
+          <span style="font-size:12px;color:var(--sys-label-2);font-weight:600">🎭 โหมดจำลองสถานการณ์:</span>
+          ${TUTOR_SCENARIOS.map(sc => `
+            <button type="button" class="${state.tutorScenario === sc.id ? 'btn-primary' : 'btn-secondary'}" data-tscenario="${escapeHtml(sc.id)}" style="padding:4px 10px;font-size:12px">${escapeHtml(sc.label)}</button>
+          `).join('')}
         </div>
 
         ${focusWords.length > 0 ? `
@@ -7457,8 +7564,19 @@
       renderTutorPage();
     });
 
+    host.querySelectorAll('[data-tscenario]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const scId = btn.dataset.tscenario || '';
+        const sc = TUTOR_SCENARIOS.find(s => s.id === scId) || TUTOR_SCENARIOS[0];
+        state.tutorScenario = sc.id;
+        state.tutorLog = [{ from: 'bot', ...sc.greeting }];
+        renderTutorPage();
+      });
+    });
+
     document.getElementById('tutor-reset-chat')?.addEventListener('click', () => {
-      state.tutorLog = [state.tutorLog[0]];
+      const sc = TUTOR_SCENARIOS.find(s => s.id === state.tutorScenario) || TUTOR_SCENARIOS[0];
+      state.tutorLog = [{ from: 'bot', ...sc.greeting }];
       renderTutorPage();
     });
 
@@ -7486,7 +7604,12 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({ message: clean, history, focusWords: activeFocusWords })
+            body: JSON.stringify({
+              message: clean,
+              history,
+              focusWords: activeFocusWords,
+              scenario: state.tutorScenario || ''
+            })
           });
           const data = await res.json().catch(() => ({}));
           if (data.usage) state.aiUsage = data.usage;

@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
   <div class="app-shell theme-light" id="app-shell">
@@ -539,20 +539,6 @@
   <script src="/data/level2-hsk1-data.js"></script>
   <script src="/data/pro-pack-data.js"></script>
   <script src="/data/fun-pack-data.js"></script>
-  <script type="module">
-    const isNetlifyOrigin =
-      window.location.protocol === 'https:' ||
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1';
-    if (isNetlifyOrigin) {
-      import('https://esm.sh/@netlify/identity@2.0.1')
-        .then((mod) => {
-          window.NetlifyAuth = mod;
-          window.dispatchEvent(new CustomEvent('netlify-auth-ready'));
-        })
-        .catch(() => {});
-    }
-  </script>
-  <script src="/app.js"></script>
+  <script type="module" src="/src/app.js"></script>
 </body>
 </html>
