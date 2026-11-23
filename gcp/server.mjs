@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GoogleGenAI, Type } from '@google/genai';
+import { firestoreGet, firestoreSet, synthesizeCloudTts } from './gcp-services.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -180,8 +181,9 @@ async function handleApi(req, res, urlObj) {
   }
 
   if (p === '/api/me/progress') {
+    const safeDocId = userId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 100);
     if (req.method === 'GET') {
-      const rec = progressStore.get(userId) || null;
+      const rec = (await firestoreGet('nihao_progress', safeDocId)) || progressStore.get(userId) || null;
       return sendJson(res, 200, {
         ok: true,
         user: { id: userId, email: '', fullName: 'Learner' },
@@ -193,7 +195,9 @@ async function handleApi(req, res, urlObj) {
       const body = await readJsonBody(req);
       const progress = body.progress && typeof body.progress === 'object' ? body.progress : body;
       const updatedAt = new Date().toISOString();
-      progressStore.set(userId, { progress, updatedAt });
+      const rec = { progress, updatedAt };
+      progressStore.set(userId, rec);
+      await firestoreSet('nihao_progress', safeDocId, rec);
       return sendJson(res, 200, { ok: true, updatedAt });
     }
     return sendJson(res, 405, { ok: false, error: 'Method not allowed' });
@@ -209,10 +213,14 @@ async function handleApi(req, res, urlObj) {
       return res.end(ttsCache.get(cacheKey));
     }
     try {
-      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(text)}`;
-      const upstream = await fetch(ttsUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-      if (!upstream.ok) return sendJson(res, 502, { ok: false, error: 'TTS upstream failed' });
-      const buf = Buffer.from(await upstream.arrayBuffer());
+      // Primary: Google Cloud Text-to-Speech (Wavenet/Neural2) when on GCP
+      let buf = await synthesizeCloudTts(text, lang);
+      if (!buf) {
+        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(text)}`;
+        const upstream = await fetch(ttsUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        if (!upstream.ok) return sendJson(res, 502, { ok: false, error: 'TTS upstream failed' });
+        buf = Buffer.from(await upstream.arrayBuffer());
+      }
       if (ttsCache.size > 400) ttsCache.clear();
       ttsCache.set(cacheKey, buf);
       res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=604800' });
@@ -263,6 +271,7 @@ async function handleApi(req, res, urlObj) {
       return sendJson(res, 429, { ok: false, code: 'RATE_LIMITED', error: `ครบโควตา AI วันนี้แล้ว (${DAILY_AI_LIMIT} ครั้ง/วัน)` });
     }
     const body = await readJsonBody(req);
+    const uiLang = String(req.headers['x-nihao-lang'] || body.lang || 'th').toLowerCase() === 'en' ? 'English' : 'Thai';
     const usage = { used: quota.used, limit: quota.limit, remaining: quota.remaining };
 
     if (p === '/api/ai/speak') {
@@ -270,8 +279,8 @@ async function handleApi(req, res, urlObj) {
       if (mode === 'translate') {
         const thai = String(body.thai || '').trim().slice(0, 240);
         const { data, model } = await generateStructuredJson({
-          contents: `Translate this Thai intent to natural beginner Mandarin Chinese: "${thai}"`,
-          systemInstruction: 'You are a Mandarin Chinese teacher for Thai beginners. Return JSON {hz, py, th, note}.',
+          contents: `Translate this ${uiLang} intent to natural beginner Mandarin Chinese: "${thai}"`,
+          systemInstruction: `You are a Mandarin Chinese teacher for ${uiLang}-speaking beginners. Return JSON {hz, py, th (translation in ${uiLang}), note (explanation in ${uiLang})}.`,
           responseSchema: {
             type: Type.OBJECT,
             properties: { hz: { type: Type.STRING }, py: { type: Type.STRING }, th: { type: Type.STRING }, note: { type: Type.STRING } },
@@ -331,7 +340,7 @@ async function handleApi(req, res, urlObj) {
     const msg = String(body.message || body.sentence || '').trim().slice(0, 500);
     const { data, model } = await generateStructuredJson({
       contents: `Learner message: "${msg}"`,
-      systemInstruction: 'Warm Mandarin Chinese tutor for Thai beginners. Reply in 1-2 short Simplified Chinese sentences with tone-marked Pinyin, Thai translation, tip, and gentle correction.',
+      systemInstruction: `Warm Mandarin Chinese tutor for ${uiLang}-speaking beginners. Reply in 1-2 short Simplified Chinese sentences with tone-marked Pinyin, ${uiLang} translation (in field th), ${uiLang} tip, and gentle ${uiLang} correction.`,
       responseSchema: {
         type: Type.OBJECT,
         properties: {

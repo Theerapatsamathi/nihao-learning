@@ -1,0 +1,41 @@
+name: Deploy to Cloud Run & Firebase Hosting
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install, test and build
+        run: |
+          npm install --no-audit --no-fund
+          npm test
+          npm run build
+
+      - name: Authenticate to Google Cloud
+        if: ${{ secrets.GCP_SA_KEY != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Deploy to Cloud Run
+        if: ${{ secrets.GCP_SA_KEY != '' }}
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: nihao-learning
+          region: asia-southeast1
+          source: .
+          flags: --allow-unauthenticated --set-env-vars=GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=project-6600ff2b-74c9-4412-8bb,GOOGLE_CLOUD_LOCATION=us-central1
+
+      - name: Deploy to Firebase Hosting
+        if: ${{ secrets.GCP_SA_KEY != '' }}
+        run: npx -y firebase-tools deploy --only hosting --project project-6600ff2b-74c9-4412-8bb

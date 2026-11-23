@@ -210,9 +210,41 @@ async function ensureFirebaseAuth() {
 }
 
 export function initFirebaseGoogleAuth(core) {
+  // Attach x-nihao-lang and x-nihao-user headers to all same-origin /api/* fetches
+  if (!window.__nihaoFetchWrapped && typeof window.fetch === 'function') {
+    window.__nihaoFetchWrapped = true;
+    const origFetch = window.fetch.bind(window);
+    window.fetch = (input, init = {}) => {
+      const url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+      if (url.startsWith('/api/')) {
+        const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+        headers.set('x-nihao-lang', currentLang);
+        if (window.__nihaoFirebaseUser?.uid) {
+          headers.set('x-nihao-user', `fb:${window.__nihaoFirebaseUser.uid}`);
+        }
+        return origFetch(input, { ...init, headers });
+      }
+      return origFetch(input, init);
+    };
+  }
+
   const host = window.location.hostname;
   const isFirebaseHost = host.endsWith('.web.app') || host.endsWith('.firebaseapp.com') || host.endsWith('.run.app');
   if (!isFirebaseHost) return;
+
+  let syncTimer = null;
+  const pushFirebaseProgress = () => {
+    if (!window.__nihaoFirebaseUser?.uid || !core?.state?.progress) return;
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      fetch('/api/me/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progress: core.state.progress })
+      }).catch(() => {});
+    }, 1500);
+  };
+  core?.on?.('progress', pushFirebaseProgress);
 
   const updateHeader = (user) => {
     const label = document.getElementById('header-auth-label');

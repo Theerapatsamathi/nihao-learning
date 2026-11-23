@@ -23,7 +23,16 @@ if (core) {
   });
 
   initQuickDictionary(core);
-  // Apply beginner mode after all feature tabs finish registering
-  core.on('features-ready', () => applyBeginnerMode(core));
+  // Apply beginner mode & auto-land new users on Month-1 tab
+  core.on('features-ready', () => {
+    const ext = core.getExt('month1');
+    const p = core.state.progress || {};
+    const hasActivity = Object.keys(p.dayScores || {}).length > 0 || Object.keys(p.activity || {}).length > 0;
+    if (!ext.welcomed) {
+      core.setExt('month1', { welcomed: true, beginnerMode: !hasActivity }, { save: false });
+      if (!hasActivity) core.switchTab('month1');
+    }
+    applyBeginnerMode(core);
+  });
   setTimeout(() => applyBeginnerMode(core), 200);
 }
