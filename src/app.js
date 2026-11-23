@@ -8706,7 +8706,8 @@ if (typeof window !== 'undefined') {
       return;
     }
 
-    const googleEnabled = authState.settings ? Boolean(authState.settings?.external?.google) : true;
+    const isFirebaseHost = /\.web\.app$|\.firebaseapp\.com$|\.run\.app$/.test(window.location.hostname);
+    const googleEnabled = isFirebaseHost || (authState.settings ? Boolean(authState.settings?.external?.google) : true);
     bd.innerHTML = `
       <div class="vb-modal" role="dialog" aria-modal="true" style="max-width:440px">
         <div class="vb-modal-head">
