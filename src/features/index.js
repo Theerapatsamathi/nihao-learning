@@ -1,6 +1,7 @@
 // Feature plugin entry. Each group registers itself through window.NihaoCore.
 // Every module is loaded independently so a failure in one never breaks the others.
 const modules = [
+  () => import('./month1/index.js'),
   () => import('./platform/index.js'),
   () => import('./motivation/index.js'),
   () => import('./lesson-path/index.js'),

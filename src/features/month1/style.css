@@ -1,0 +1,110 @@
+/* Month-1 Starter Pack (m1- prefixed) */
+.m1-nav-hidden { display: none !important; }
+.m1-subnav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.m1-pill {
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--sys-sep, rgba(0,0,0,.12));
+  background: var(--sys-bg-elevated, #fff); color: var(--sys-label, #111);
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s ease;
+}
+.m1-pill.active { background: var(--sys-accent, #007aff); color: #fff; border-color: transparent; }
+.m1-dict-pill { margin-left: auto; }
+
+.m1-hero { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.m1-hero-left { flex: 1; min-width: 240px; }
+.m1-kpi-mini { display: flex; gap: 12px; }
+.m1-kpi-mini > div {
+  background: var(--sys-fill-3, rgba(120,120,128,.12)); border-radius: 12px;
+  padding: 10px 14px; text-align: center; min-width: 72px;
+}
+.m1-kpi-mini strong { display: block; font-size: 18px; }
+.m1-kpi-mini span { font-size: 11.5px; color: var(--sys-label-2, #666); }
+
+.m1-toggle-chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 10px;
+  background: var(--sys-fill-3, rgba(120,120,128,.12)); font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.m1-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+  background: rgba(0,122,255,.12); color: var(--sys-accent-text, #0066d6);
+}
+.m1-muted { color: var(--sys-label-2, #666); }
+.m1-hz { font-size: 20px; font-weight: 700; }
+.m1-py { font-size: 13.5px; color: var(--sys-accent-text, #0066d6); font-weight: 600; }
+.m1-tip { font-size: 12px; color: var(--sys-label-2, #666); margin-top: 4px; }
+
+.m1-days-grid, .m1-tone-grid, .m1-mnem-grid, .m1-traps-grid {
+  display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+.m1-day-card, .m1-tone-card, .m1-mnem-card, .m1-trap-card {
+  border: 1px solid var(--sys-sep, rgba(0,0,0,.1)); border-radius: 14px; padding: 12px;
+  background: var(--sys-bg-elevated, #fff);
+}
+.m1-day-card.current { border-color: var(--sys-accent, #007aff); box-shadow: 0 0 0 2px rgba(0,122,255,.15); }
+.m1-day-card.done, .m1-tone-card.done, .m1-mnem-card.done, .m1-item.done {
+  border-color: rgba(52,199,89,.5); background: rgba(52,199,89,.06);
+}
+.m1-mnem-char { font-size: 40px; font-weight: 700; line-height: 1.1; }
+.m1-check-btn { border: none; background: transparent; font-size: 18px; cursor: pointer; padding: 2px 4px; }
+.m1-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.m1-chip {
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--sys-sep, rgba(0,0,0,.12));
+  background: var(--sys-fill-3, rgba(120,120,128,.1)); color: var(--sys-label, #111);
+  font-size: 12.5px; cursor: pointer;
+}
+.m1-chip.active { background: var(--sys-accent, #007aff); color: #fff; border-color: transparent; }
+.m1-mini-btn { padding: 5px 10px !important; font-size: 12px !important; }
+.m1-trap-pair { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
+
+.m1-list { display: flex; flex-direction: column; gap: 10px; }
+.m1-item {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  border: 1px solid var(--sys-sep, rgba(0,0,0,.1)); border-radius: 12px; padding: 12px;
+}
+.m1-row-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.m1-runner-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.m1-runner-foot { margin-top: 16px; display: flex; justify-content: flex-end; }
+.m1-prog { height: 8px; border-radius: 999px; background: var(--sys-fill-3, rgba(120,120,128,.15)); margin: 12px 0 16px; overflow: hidden; }
+.m1-prog-fill { height: 100%; background: var(--sys-accent, #007aff); transition: width .25s ease; }
+.m1-quiz-inline {
+  padding: 12px; border-radius: 12px; margin-bottom: 14px;
+  background: rgba(0,122,255,.07); border: 1px solid rgba(0,122,255,.2);
+}
+
+/* Quick Dictionary Modal */
+.m1-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); backdrop-filter: blur(4px);
+  display: flex; align-items: flex-start; justify-content: center; padding: 48px 14px 14px; z-index: 9999;
+}
+.m1-modal-backdrop[hidden] { display: none; }
+.m1-modal {
+  width: 100%; max-width: 620px; max-height: 82vh; display: flex; flex-direction: column;
+  background: var(--sys-bg-elevated, #fff); color: var(--sys-label, #111);
+  border-radius: 16px; padding: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.28);
+}
+.m1-modal-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+.m1-dict-bar { margin-bottom: 10px; }
+.m1-dict-bar input { width: 100%; box-sizing: border-box; }
+.m1-dict-results { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; max-height: 55vh; }
+.m1-dict-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: 12px; border: 1px solid var(--sys-sep, rgba(0,0,0,.1));
+}
+.m1-dict-hz { font-size: 18px; font-weight: 700; }
+.m1-dict-py { font-size: 13px; color: var(--sys-accent-text, #0066d6); font-weight: 600; margin-left: 6px; }
+.m1-dict-th { font-size: 13.5px; }
+.m1-dict-extra { font-size: 12px; color: var(--sys-label-2, #666); margin-top: 2px; }
+.m1-dict-actions { display: flex; align-items: center; gap: 6px; }
+.m1-dict-empty { padding: 18px 8px; text-align: center; color: var(--sys-label-2, #666); }
+.m1-stroke-box {
+  padding: 10px 12px; border-radius: 12px; margin-bottom: 10px;
+  background: var(--sys-fill-3, rgba(120,120,128,.1));
+}
+.m1-stroke-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.m1-stroke-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.m1-hw-box { width: 88px; height: 88px; background: #fff; border-radius: 10px; border: 1px solid rgba(0,0,0,.12); }
+
+.theme-dark .m1-day-card, .theme-dark .m1-tone-card, .theme-dark .m1-mnem-card,
+.theme-dark .m1-trap-card, .theme-dark .m1-modal, .theme-dark .m1-pill {
+  background: var(--sys-bg-elevated, #1c1c1e); color: var(--sys-label, #f5f5f7);
+}
+.theme-dark .m1-pill.active { background: var(--sys-accent, #0a84ff); color: #fff; }
