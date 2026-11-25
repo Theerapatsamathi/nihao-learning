@@ -18,6 +18,19 @@ const TH_TO_EN = new Map([
   ['สมัครสมาชิก', 'Create Account'],
 
   // Sidebar sections & tabs
+  ['🏠 หน้าแรกวันนี้', '🏠 Today Hub'],
+  ['หน้าแรกวันนี้', 'Today Hub'],
+  ['🗺️ บทเรียนหลัก', '🗺️ Core Lessons'],
+  ['🎙️ ฝึกพูด AI', '🎙️ AI Speaking'],
+  ['📚 คลังศัพท์ & อ่านจีนจริง', '📚 Vocab & Immersion'],
+  ['คลังศัพท์ & FSRS', 'Vocab & FSRS'],
+  ['อ่าน & แกะเพลงจีน', 'Read & Lyrics Lab'],
+  ['✍️ สมุดคัด & ลำดับขีด', '✍️ Copybook & Strokes'],
+  ['สมุดคัด & AI ตรวจ', 'Copybook & AI Grader'],
+  ['⚔️ แข่งขัน & สังคม', '⚔️ Arena & Social'],
+  ['ดวล 1v1 & ตีบอส', '1v1 Duel & Boss Raid'],
+  ['🧰 เครื่องมือพินอิน & สอบจำลอง ▾', '🧰 Pinyin Tools & Mock Exam ▾'],
+  ['⚙️ ระบบ & ออฟไลน์', '⚙️ System & Offline'],
   ['🌱 เดือนแรก (แนะนำ)', '🌱 Month 1 (Recommended)'],
   ['เดือนแรก 0→HSK1', 'Month 1: 0→HSK1'],
   ['30 วัน', '30 Days'],
@@ -210,17 +223,36 @@ async function ensureFirebaseAuth() {
 }
 
 export function initFirebaseGoogleAuth(core) {
-  // Attach x-nihao-lang and x-nihao-user headers to all same-origin /api/* fetches
+  let cachedIdToken = '';
+  let cachedIdTokenExp = 0;
+
+  async function getFreshFirebaseToken() {
+    const u = window.__nihaoFirebaseUser;
+    if (!u || typeof u.getIdToken !== 'function') return '';
+    if (cachedIdToken && Date.now() < cachedIdTokenExp) return cachedIdToken;
+    try {
+      cachedIdToken = await u.getIdToken(false);
+      cachedIdTokenExp = Date.now() + 45 * 60 * 1000;
+      return cachedIdToken;
+    } catch {
+      return '';
+    }
+  }
+
+  // Attach x-nihao-lang and verified Authorization Bearer token to all same-origin /api/* fetches
   if (!window.__nihaoFetchWrapped && typeof window.fetch === 'function') {
     window.__nihaoFetchWrapped = true;
     const origFetch = window.fetch.bind(window);
-    window.fetch = (input, init = {}) => {
+    window.fetch = async (input, init = {}) => {
       const url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
       if (url.startsWith('/api/')) {
         const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
         headers.set('x-nihao-lang', currentLang);
-        if (window.__nihaoFirebaseUser?.uid) {
-          headers.set('x-nihao-user', `fb:${window.__nihaoFirebaseUser.uid}`);
+        const idToken = await getFreshFirebaseToken();
+        if (idToken) {
+          headers.set('Authorization', `Bearer ${idToken}`);
+        } else if (core?.state?.syncId) {
+          headers.set('x-nihao-user', core.state.syncId);
         }
         return origFetch(input, { ...init, headers });
       }

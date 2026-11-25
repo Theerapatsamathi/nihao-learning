@@ -75,8 +75,8 @@ core.registerTab({
   title: 'ภารกิจ & ลีก (Motivation)',
   desc: 'เป้าหมายรายวัน ซ่อมสตรีค ลีกประจำสัปดาห์ เพื่อน สมุดคำผิด สมุดโน้ต แผนการเรียน และใบประกาศฯ',
   emoji: '🔥',
-  section: 'motivate',
-  sectionTitle: '🔥 Motivation',
+  section: 'social',
+  sectionTitle: '⚔️ แข่งขัน & สังคม',
   render: renderMotivationTab
 });
 

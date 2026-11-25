@@ -1,5 +1,5 @@
 import * as NetlifyAuthMod from '@netlify/identity';
-import { computeNextSm2, computeSrsRetention } from './modules/srs-sm2.js';
+import { computeNextSm2, computeNextFsrs, computeRetrievability, selectBedtimeDeck, computeSrsRetention } from './modules/srs-sm2.js';
 import { mergeCloudProgressData } from './modules/progress-merge.js';
 if (typeof window !== 'undefined') {
   window.NetlifyAuth = NetlifyAuthMod;
@@ -3964,10 +3964,12 @@ if (typeof window !== 'undefined') {
           ${sess.flipped ? (() => {
             const curSrs = srsMap[activeWord.id];
             const tk = todayKey();
-            const dHard = computeNextSm2(curSrs, 'hard', tk).interval;
-            const dGood = computeNextSm2(curSrs, 'good', tk).interval;
-            const dEasy = computeNextSm2(curSrs, 'easy', tk).interval;
+            const rPct = Math.round(computeRetrievability(curSrs, tk) * 100);
+            const dHard = computeNextFsrs(curSrs, 'hard', tk).interval;
+            const dGood = computeNextFsrs(curSrs, 'good', tk).interval;
+            const dEasy = computeNextFsrs(curSrs, 'easy', tk).interval;
             return `
+            <div style="text-align:center;font-size:12px;color:var(--sys-accent-text);font-weight:600;margin:6px 0">🧠 FSRS Memory Retrievability: ${rPct}%</div>
             <div class="vsrs-rate-bar">
               <button type="button" class="vsrs-rate-btn r-again" data-rate="again"><b>ลืมแล้ว</b><small>[1] ทวนซ้ำวันนี้</small></button>
               <button type="button" class="vsrs-rate-btn r-hard" data-rate="hard"><b>จำไม่ค่อยแม่น</b><small>[2] +${dHard} วัน</small></button>
@@ -3976,21 +3978,23 @@ if (typeof window !== 'undefined') {
             </div>
             `;
           })() : `
-            <div style="text-align:center;margin-top:12px">
+            <div style="text-align:center;margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
               <button type="button" class="btn-primary" id="vsrs-flip-btn">พลิกดูเฉลย →</button>
+              <button type="button" class="btn-secondary" id="vsrs-bedtime-inline">🌙 โหมดทวนก่อนนอน 3 นาที (12 คำเสี่ยงลืม)</button>
             </div>
           `}
-          <div style="text-align:center;font-size:12px;color:var(--sys-label-3);margin-top:10px">คีย์ลัด: Space พลิกการ์ด · 1–4 ให้คะแนน · R ฟังเสียงซ้ำ</div>
+          <div style="text-align:center;font-size:12px;color:var(--sys-label-3);margin-top:10px">ระบบ FSRS-4.5 ลดภาระการ์ดซ้ำ ~25% · คีย์ลัด: Space พลิกการ์ด · 1–4 ให้คะแนน · R ฟังเสียงซ้ำ</div>
         </div>
       ` : `
         <div class="vsrs-empty-card">
           <div style="font-size:38px;margin-bottom:8px">🎉</div>
-          <h3>${totalInSrs === 0 ? 'ยังไม่มีคำศัพท์ในระบบทวน SRS' : 'ทวนคำศัพท์ครบตามกำหนดวันนี้แล้ว!'}</h3>
+          <h3>${totalInSrs === 0 ? 'ยังไม่มีคำศัพท์ในระบบทวน FSRS' : 'ทวนคำศัพท์ครบตามกำหนดวันนี้แล้ว!'}</h3>
           <p>${totalInSrs === 0
-            ? 'เริ่มกด "+ สะสมคำนี้" ในแท็บคลังศัพท์ 100 คำ/วัน แล้วระบบจะคำนวณรอบทวน 1 → 3 → 7 → 14 → 30 วันให้อัตโนมัติครับ'
-            : 'คำที่คุณสะสมวันนี้จะครบกำหนดทวนรอบแรกในวันพรุ่งนี้ หรือจะกดทวนล่วงหน้าตอนนี้เลยก็ได้ครับ'}</p>
+            ? 'เริ่มกด "+ สะสมคำนี้" ในแท็บคลังศัพท์ 100 คำ/วัน แล้วระบบ FSRS จะคำนวณเส้นโค้งการลืมรายคำให้อัตโนมัติครับ'
+            : 'คำที่คุณสะสมวันนี้ถูกจัดตารางด้วยอัลกอริทึม FSRS เรียบร้อย หรือกดโหมดทวนก่อนนอน 3 นาทีด้านล่างเพื่อล็อกความจำระยะยาว!'}</p>
           <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px">
-            ${todayWords.length > 0 ? `<button type="button" class="btn-primary" id="vsrs-early-today">⚡ ทวนล่วงหน้าจากคำที่สะสมวันนี้ (${todayWords.length} คำ)</button>` : ''}
+            ${totalInSrs > 0 ? `<button type="button" class="btn-primary" id="vsrs-bedtime-btn">🌙 ทวนก่อนนอน 3 นาที (12 คำเสี่ยงลืมสูงสุด)</button>` : ''}
+            ${todayWords.length > 0 ? `<button type="button" class="btn-secondary" id="vsrs-early-today">⚡ ทวนคำที่สะสมวันนี้ (${todayWords.length} คำ)</button>` : ''}
             ${totalInSrs > 0 ? `<button type="button" class="btn-secondary" id="vsrs-early-all">สุ่มทวน 20 คำจากที่สะสมทั้งหมด</button>` : ''}
             <button type="button" class="btn-secondary" id="vsrs-go-bank">← ไปหน้าคลังศัพท์ 100 คำ</button>
           </div>
@@ -4013,12 +4017,29 @@ if (typeof window !== 'undefined') {
     document.getElementById('vsrs-flashcard')?.addEventListener('click', flipCard);
     document.getElementById('vsrs-flip-btn')?.addEventListener('click', flipCard);
 
+    const startBedtime3Min = () => {
+      const allL = getVocabQuizPool('all_learned');
+      const deck = selectBedtimeDeck(allL, srsMap, todayKey(), 12);
+      if (!deck.length) {
+        showToast('ยังไม่มีคำศัพท์ที่สะสมไว้สำหรับทบทวนก่อนนอนครับ');
+        return;
+      }
+      sess.queue = deck;
+      sess.idx = 0;
+      sess.flipped = false;
+      sess.earlyMode = true;
+      showToast(`🌙 เริ่มโหมดทวนก่อนนอน 3 นาที (${deck.length} คำที่เสี่ยงลืมที่สุด)`);
+      renderVocabSrs();
+    };
+    document.getElementById('vsrs-bedtime-btn')?.addEventListener('click', startBedtime3Min);
+    document.getElementById('vsrs-bedtime-inline')?.addEventListener('click', startBedtime3Min);
+
     container.querySelectorAll('[data-rate]').forEach(btn => {
       btn.addEventListener('click', () => {
         if (!activeWord) return;
         const rate = btn.dataset.rate;
         const tk = todayKey();
-        const nextEntry = computeNextSm2(srsMap[activeWord.id], rate, tk);
+        const nextEntry = computeNextFsrs(srsMap[activeWord.id], rate, tk);
         if (rate === 'again') {
           sess.queue.push(activeWord); // re-queue in current session
         }
@@ -8482,6 +8503,12 @@ if (typeof window !== 'undefined') {
     data: { DATA, CHART, WS, PLAN, ENG, L2, PRO, FUN },
     get lexicon() { return LEXICON; },
     ensureLexiconLoaded,
+    getDueVocabSrsCount: () => getDueVocabSrsWords().length,
+    openVocabBedtimeReview: () => {
+      state.vocabMode = 'srs';
+      switchTab('vocab');
+      setTimeout(() => document.getElementById('vsrs-bedtime-btn')?.click() || document.getElementById('vsrs-bedtime-inline')?.click(), 60);
+    },
     allVocabWords,
     allInitials,
     allFinals,

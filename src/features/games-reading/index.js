@@ -5,6 +5,8 @@ import { renderStoriesSection } from './stories.js';
 import { renderScenesSection } from './scenes.js';
 import { renderPodcastSection } from './podcast.js';
 import { renderCultureSection, renderCultureWidget } from './culture.js';
+import { renderSmartImporterSection } from './smart-importer.js';
+import { renderSnapCameraSection } from './snap-camera.js';
 import { closeWordPopover } from './word-popover.js';
 import { getGrExt, esc } from './utils.js';
 import { GRADED_STORIES } from './data-stories.js';
@@ -16,6 +18,8 @@ const core = window.NihaoCore;
 
 const SUBTABS = [
   { id: 'home', emoji: '🏠', label: 'หน้าหลัก' },
+  { id: 'importer', emoji: '🎵', label: 'แกะเพลง/ซับจีน' },
+  { id: 'snap', emoji: '📸', label: 'ถ่ายรูปแปลเมนู' },
   { id: 'games', emoji: '🎮', label: 'มินิเกม (4)' },
   { id: 'stories', emoji: '📖', label: 'นิทาน & คาราโอเกะ' },
   { id: 'scenes', emoji: '🎬', label: 'ฉากจำลอง' },
@@ -47,6 +51,20 @@ function renderHome(host, switchSub) {
   const grid = document.createElement('div');
   grid.className = 'gr-grid-2';
   const cards = [
+    {
+      id: 'importer',
+      emoji: '🎵',
+      badge: 'NEW · C-Pop',
+      title: 'แกะเพลงจีน / ซับซีรีส์ / บทความเอง',
+      sub: 'วางเนื้อเพลงหรือข้อความจีนอะไรก็ได้ → ตัดคำใส่พินอิน แตะแปล เก็บเข้า SRS และสร้างห้องดวล 1v1 ทันที'
+    },
+    {
+      id: 'snap',
+      emoji: '📸',
+      badge: 'NEW · Vision AI',
+      title: 'ถ่ายรูปเมนูอาหาร & ป้ายร้านจีน (Snap & Learn)',
+      sub: 'เปิดกล้องถ่ายเมนูหรือป้ายภาษาจีน ให้ครู AI ดึงคำศัพท์ พินอิน และประโยคสั่งอาหารที่ใช้พูดจริง'
+    },
     {
       id: 'games',
       emoji: '🎮',
@@ -112,13 +130,17 @@ if (core?.registerTab) {
 
   core.registerTab({
     id: 'games-reading',
-    label: 'เกม & อ่านจีน',
-    title: 'เกม & อ่านจีน',
-    desc: 'มินิเกม นิทานภาษาจีน คาราโอเกะ ฉากจำลอง พอดแคสต์ และวัฒนธรรมจีน',
+    label: 'อ่าน & แกะเพลงจีน',
+    title: 'อ่านจีน · แกะเพลง · ถ่ายเมนู & มินิเกม',
+    desc: 'วางเนื้อเพลง/ซับซีรีส์แตะแปลคำ ถ่ายรูปเมนูจีน นิทานคาราโอเกะ ฉากจำลอง และมินิเกม',
     emoji: '🎮',
-    section: 'play',
-    sectionTitle: '🎮 Play & Read',
+    section: 'vocab-read',
+    sectionTitle: '📚 คลังศัพท์ & อ่านจีนจริง',
     render(host) {
+      if (window.__nihaoOpenReadingSub) {
+        currentSubtab = window.__nihaoOpenReadingSub;
+        window.__nihaoOpenReadingSub = null;
+      }
       runCleanup();
       host.innerHTML = `
         <div class="gr-root">
@@ -142,6 +164,8 @@ if (core?.registerTab) {
         });
         bodyEl.innerHTML = '';
         if (subId === 'home') renderHome(bodyEl, switchSub);
+        else if (subId === 'importer') activeCleanup = renderSmartImporterSection(core, bodyEl);
+        else if (subId === 'snap') activeCleanup = renderSnapCameraSection(core, bodyEl);
         else if (subId === 'games') activeCleanup = renderGamesSection(core, bodyEl);
         else if (subId === 'stories') activeCleanup = renderStoriesSection(core, bodyEl);
         else if (subId === 'scenes') activeCleanup = renderScenesSection(core, bodyEl);

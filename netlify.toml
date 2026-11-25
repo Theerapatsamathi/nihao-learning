@@ -1,44 +1,6 @@
+# Netlify deployment has been permanently retired in favor of Google Cloud Run + Firebase Hosting (https://nihao-chinese.web.app)
+# `ignore = "exit 0"` ensures Netlify skips all automated Git builds and consumes zero build credits.
+
 [build]
-  command = "npm run build"
+  ignore = "exit 0"
   publish = "dist"
-
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
-
-[dev]
-  command = "npm run dev:vite"
-  targetPort = 5173
-
-# Security headers for all routes
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Content-Type-Options = "nosniff"
-    X-Frame-Options = "DENY"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), geolocation=(), payment=()"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; connect-src 'self' https://cdn.jsdelivr.net https://esm.sh; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-
-# Service Worker must never be cached by HTTP caches
-[[headers]]
-  for = "/sw.js"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-
-# Immutable content-hashed Vite bundles & vendored libs
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-[[headers]]
-  for = "/vendor/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-# Long-lived cache for static data packs
-[[headers]]
-  for = "/data/*"
-  [headers.values]
-    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"

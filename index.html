@@ -63,85 +63,97 @@
       <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
       <aside class="sidebar" id="sidebar" aria-label="เมนูบทเรียน">
         <nav class="nav-panel" role="tablist">
-          <div class="nav-section">Learning Path</div>
-          <button type="button" class="nav-link" data-tab="profile" role="tab" aria-selected="false">
-            <span class="nav-icon icon-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
-            <span class="nav-label-text">โปรไฟล์ & แผนที่ด่าน</span>
-            <span class="nav-badge" id="nav-lv-badge">LV.1</span>
-          </button>
+          <div class="nav-section" data-feature-section="home">🏠 หน้าแรกวันนี้</div>
+          <div class="nav-section" data-feature-section="path">🗺️ บทเรียนหลัก</div>
           <button type="button" class="nav-link active" data-tab="plan" role="tab" aria-selected="true">
             <span class="nav-icon icon-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
             <span class="nav-label-text">แผนเรียน 14 วัน</span>
             <span class="nav-badge" id="nav-days-badge">0/14</span>
           </button>
-          <button type="button" class="nav-link" data-tab="vocab" role="tab" aria-selected="false">
-            <span class="nav-icon icon-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
-            <span class="nav-label-text">คำศัพท์พื้นฐาน</span>
-            <span class="nav-badge" id="nav-vocab-badge">0/100</span>
-          </button>
 
-          <div class="nav-section">Pinyin System</div>
-          <button type="button" class="nav-link" data-tab="initials" role="tab" aria-selected="false">
-            <span class="nav-icon icon-indigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></span>
-            <span class="nav-label-text">พยัญชนะต้น</span>
-            <span class="nav-badge muted-badge">23</span>
-          </button>
-          <button type="button" class="nav-link" data-tab="finals" role="tab" aria-selected="false">
-            <span class="nav-icon icon-cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></span>
-            <span class="nav-label-text">สระพินอิน</span>
-            <span class="nav-badge muted-badge">36</span>
-          </button>
-          <button type="button" class="nav-link" data-tab="tones" role="tab" aria-selected="false">
-            <span class="nav-icon icon-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
-            <span class="nav-label-text">วรรณยุกต์ & กฎผัน</span>
-            <span class="nav-badge muted-badge">4+1</span>
-          </button>
-          <button type="button" class="nav-link" data-tab="chart" role="tab" aria-selected="false">
-            <span class="nav-icon icon-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span>
-            <span class="nav-label-text">ตารางพินอินเต็ม</span>
-            <span class="nav-badge muted-badge">405</span>
-          </button>
-          <button type="button" class="nav-link" data-tab="combiner" role="tab" aria-selected="false">
-            <span class="nav-icon icon-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
-            <span class="nav-label-text">ห้องผสมคำ</span>
-          </button>
-
-          <div class="nav-section">Practice & Writing</div>
-          <button type="button" class="nav-link" data-tab="writing" role="tab" aria-selected="false">
-            <span class="nav-icon icon-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg></span>
-            <span class="nav-label-text">ฝึกเขียนลำดับขีด</span>
-            <span class="nav-badge muted-badge">32</span>
-          </button>
-          <button type="button" class="nav-link" data-tab="srs" role="tab" aria-selected="false">
-            <span class="nav-icon icon-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 2v4"/><path d="M16 2v4"/><path d="M7 12h10"/></svg></span>
-            <span class="nav-label-text">การ์ด SRS & บทสนทนา</span>
-            <span class="nav-badge" id="nav-srs-badge">34</span>
-          </button>
-          <button type="button" class="nav-link" data-tab="speed" role="tab" aria-selected="false">
-            <span class="nav-icon icon-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
-            <span class="nav-label-text">เกม Speed Match</span>
-          </button>
-          <button type="button" class="nav-link" data-tab="practice" role="tab" aria-selected="false">
-            <span class="nav-icon icon-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
-            <span class="nav-label-text">ฝึกฟัง-พูด & สอบเวล 1</span>
-          </button>
-
-          <div class="nav-section">World 2 · HSK 1</div>
-          <button type="button" class="nav-link" data-tab="level2" role="tab" aria-selected="false">
-            <span class="nav-icon icon-indigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h14"/></svg></span>
-            <span class="nav-label-text">แต่งประโยค & HSK 1</span>
-            <span class="nav-badge muted-badge">150</span>
-          </button>
+          <div class="nav-section" data-feature-section="speak">🎙️ ฝึกพูด AI</div>
           <button type="button" class="nav-link" data-tab="tutor" role="tab" aria-selected="false">
             <span class="nav-icon icon-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
             <span class="nav-label-text">คู่ซ้อมสนทนาจีน</span>
             <span class="nav-badge">AI</span>
           </button>
-          <button type="button" class="nav-link" data-tab="mock" role="tab" aria-selected="false">
-            <span class="nav-icon icon-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
-            <span class="nav-label-text">สอบจำลอง HSK 1</span>
-            <span class="nav-badge muted-badge">200</span>
+
+          <div class="nav-section" data-feature-section="vocab-read">📚 คลังศัพท์ & อ่านจีนจริง</div>
+          <button type="button" class="nav-link" data-tab="vocab" role="tab" aria-selected="false">
+            <span class="nav-icon icon-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+            <span class="nav-label-text">คลังศัพท์ & FSRS</span>
+            <span class="nav-badge" id="nav-vocab-badge">0/100</span>
           </button>
+
+          <div class="nav-section" data-feature-section="write-studio">✍️ สมุดคัด & ลำดับขีด</div>
+          <button type="button" class="nav-link" data-tab="writing" role="tab" aria-selected="false">
+            <span class="nav-icon icon-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg></span>
+            <span class="nav-label-text">ฝึกเขียนลำดับขีด</span>
+            <span class="nav-badge muted-badge">32</span>
+          </button>
+
+          <div class="nav-section" data-feature-section="social">⚔️ แข่งขัน & สังคม</div>
+          <button type="button" class="nav-link" data-tab="profile" role="tab" aria-selected="false">
+            <span class="nav-icon icon-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
+            <span class="nav-label-text">โปรไฟล์ & แผนที่ด่าน</span>
+            <span class="nav-badge" id="nav-lv-badge">LV.1</span>
+          </button>
+
+          <!-- Collapsible Reference & Classic Tools Drawer so Sidebar stays ultra-clean -->
+          <details class="nav-more-drawer">
+            <summary class="nav-section nav-more-summary">🧰 เครื่องมือพินอิน & สอบจำลอง ▾</summary>
+            <div class="nav-more-items">
+              <button type="button" class="nav-link" data-tab="initials" role="tab" aria-selected="false">
+                <span class="nav-icon icon-indigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></span>
+                <span class="nav-label-text">พยัญชนะต้น</span>
+                <span class="nav-badge muted-badge">23</span>
+              </button>
+              <button type="button" class="nav-link" data-tab="finals" role="tab" aria-selected="false">
+                <span class="nav-icon icon-cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></span>
+                <span class="nav-label-text">สระพินอิน</span>
+                <span class="nav-badge muted-badge">36</span>
+              </button>
+              <button type="button" class="nav-link" data-tab="tones" role="tab" aria-selected="false">
+                <span class="nav-icon icon-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+                <span class="nav-label-text">วรรณยุกต์ & กฎผัน</span>
+                <span class="nav-badge muted-badge">4+1</span>
+              </button>
+              <button type="button" class="nav-link" data-tab="chart" role="tab" aria-selected="false">
+                <span class="nav-icon icon-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span>
+                <span class="nav-label-text">ตารางพินอินเต็ม</span>
+                <span class="nav-badge muted-badge">405</span>
+              </button>
+              <button type="button" class="nav-link" data-tab="combiner" role="tab" aria-selected="false">
+                <span class="nav-icon icon-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+                <span class="nav-label-text">ห้องผสมคำ</span>
+              </button>
+              <button type="button" class="nav-link" data-tab="srs" role="tab" aria-selected="false">
+                <span class="nav-icon icon-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 2v4"/><path d="M16 2v4"/><path d="M7 12h10"/></svg></span>
+                <span class="nav-label-text">การ์ด SRS & บทสนทนา</span>
+                <span class="nav-badge" id="nav-srs-badge">34</span>
+              </button>
+              <button type="button" class="nav-link" data-tab="speed" role="tab" aria-selected="false">
+                <span class="nav-icon icon-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+                <span class="nav-label-text">เกม Speed Match</span>
+              </button>
+              <button type="button" class="nav-link" data-tab="practice" role="tab" aria-selected="false">
+                <span class="nav-icon icon-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+                <span class="nav-label-text">ฝึกฟัง-พูด & สอบเวล 1</span>
+              </button>
+              <button type="button" class="nav-link" data-tab="level2" role="tab" aria-selected="false">
+                <span class="nav-icon icon-indigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h14"/></svg></span>
+                <span class="nav-label-text">แต่งประโยค & HSK 1</span>
+                <span class="nav-badge muted-badge">150</span>
+              </button>
+              <button type="button" class="nav-link" data-tab="mock" role="tab" aria-selected="false">
+                <span class="nav-icon icon-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+                <span class="nav-label-text">สอบจำลอง HSK 1</span>
+                <span class="nav-badge muted-badge">200</span>
+              </button>
+            </div>
+          </details>
+
+          <div class="nav-section" data-feature-section="system">⚙️ ระบบ & ออฟไลน์</div>
         </nav>
 
         <!-- Minimal Level & XP Footer in Sidebar -->

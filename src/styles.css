@@ -337,6 +337,31 @@ button:focus-visible {
   padding-top: 4px;
 }
 
+.nav-more-drawer {
+  margin-top: 6px;
+  border-top: 1px solid var(--sys-separator);
+  padding-top: 4px;
+}
+.nav-more-summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  border-radius: 8px;
+}
+.nav-more-summary::-webkit-details-marker {
+  display: none;
+}
+.nav-more-summary:hover {
+  color: var(--sys-label);
+  background: var(--sys-surface-hover);
+}
+.nav-more-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 2px;
+}
+
 .nav-link {
   display: flex;
   align-items: center;

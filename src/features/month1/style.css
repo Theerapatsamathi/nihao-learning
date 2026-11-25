@@ -164,6 +164,47 @@
   touch-action: none; cursor: crosshair;
 }
 
+/* AI Handwriting Grader & Handwriting Lookup Canvas */
+.m1-ai-btn {
+  background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+.m1-ai-grade-panel {
+  margin-bottom: 14px;
+  border: 1.5px solid rgba(124, 58, 237, 0.35);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.06), rgba(37, 99, 235, 0.04));
+}
+.m1-ai-grade-head {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.m1-ai-grade-badge {
+  width: 54px; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+}
+.m1-ai-grade-badge.grade-mid { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.m1-ai-grade-grid {
+  display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.m1-ai-grade-item {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+  border-radius: 12px; background: var(--sys-bg-elevated, #fff); border: 1px solid var(--sys-sep, rgba(0,0,0,.1));
+}
+.m1-ai-char {
+  font-size: 32px; font-weight: 700; min-width: 42px; text-align: center; line-height: 1.1;
+  color: var(--sys-label, #111);
+}
+.m1-draw-pad-wrap {
+  display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap;
+  padding: 12px; border-radius: 12px; margin-bottom: 10px;
+  background: var(--sys-fill-3, rgba(120,120,128,.1));
+}
+.m1-draw-canvas {
+  width: 156px; height: 156px; background: #fffdf7; border: 2px solid #e11d48; border-radius: 10px;
+  touch-action: none; cursor: crosshair; flex-shrink: 0;
+}
+
 @media print {
   .app-header, .sidebar, .m1-cb-toolbar, .page-head, .m1-tiny-btn { display: none !important; }
   .main-content, .content-wrap, .m1-cb-sheet { padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: none !important; }

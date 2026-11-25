@@ -1,8 +1,13 @@
-// Lightweight GCP Metadata Server token + Firestore REST + Cloud TTS (Neural2/Wavenet) helpers
+// Lightweight GCP Metadata Server token + Firestore REST + Cloud TTS + Firebase ID Token verification helpers
 // Zero external npm dependencies; falls back gracefully when running locally outside GCP.
+
+import crypto from 'node:crypto';
 
 let cachedToken = null;
 let cachedTokenExp = 0;
+
+let cachedFirebaseCerts = null;
+let cachedFirebaseCertsExp = 0;
 
 export async function getGcpAccessToken() {
   if (cachedToken && Date.now() < cachedTokenExp - 60_000) return cachedToken;
@@ -21,8 +26,79 @@ export async function getGcpAccessToken() {
   }
 }
 
-function getProjectId() {
-  return process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT || '';
+export function getProjectId() {
+  return process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT || process.env.FIREBASE_PROJECT_ID || '';
+}
+
+async function getFirebasePublicCerts() {
+  if (cachedFirebaseCerts && Date.now() < cachedFirebaseCertsExp) return cachedFirebaseCerts;
+  try {
+    const res = await fetch(
+      'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com',
+      { signal: AbortSignal.timeout(2500) }
+    );
+    if (!res.ok) return null;
+    const cc = String(res.headers.get('cache-control') || '');
+    const m = cc.match(/max-age=(\d+)/);
+    const maxAgeSec = m ? Math.max(60, Number(m[1])) : 3600;
+    cachedFirebaseCerts = await res.json();
+    cachedFirebaseCertsExp = Date.now() + maxAgeSec * 1000;
+    return cachedFirebaseCerts;
+  } catch {
+    return null;
+  }
+}
+
+function decodeJwtPart(b64url) {
+  const txt = Buffer.from(String(b64url || ''), 'base64url').toString('utf8');
+  return JSON.parse(txt);
+}
+
+/**
+ * Verifies a Firebase Auth ID token (RS256) against Google's public x509 certs.
+ * Returns `{ uid, email, name }` when valid, or `null` when invalid/expired.
+ */
+export async function verifyFirebaseIdToken(idToken) {
+  try {
+    const raw = String(idToken || '').trim();
+    const parts = raw.split('.');
+    if (parts.length !== 3) return null;
+    const header = decodeJwtPart(parts[0]);
+    const payload = decodeJwtPart(parts[1]);
+    if (header.alg !== 'RS256' || !header.kid) return null;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (!payload.sub || typeof payload.sub !== 'string') return null;
+    if (payload.exp && Number(payload.exp) < nowSec - 30) return null;
+    if (payload.iat && Number(payload.iat) > nowSec + 300) return null;
+
+    const expectedProject = getProjectId();
+    if (expectedProject) {
+      if (payload.aud !== expectedProject) return null;
+      if (payload.iss !== `https://securetoken.google.com/${expectedProject}`) return null;
+    } else if (!String(payload.iss || '').startsWith('https://securetoken.google.com/')) {
+      return null;
+    }
+
+    const certs = await getFirebasePublicCerts();
+    const certPem = certs?.[header.kid];
+    if (!certPem) return null;
+
+    const verifier = crypto.createVerify('RSA-SHA256');
+    verifier.update(`${parts[0]}.${parts[1]}`);
+    verifier.end();
+    const sigBuf = Buffer.from(parts[2], 'base64url');
+    const valid = verifier.verify(certPem, sigBuf);
+    if (!valid) return null;
+
+    return {
+      uid: payload.sub.slice(0, 120),
+      email: String(payload.email || ''),
+      name: String(payload.name || '')
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function firestoreGet(collection, docId) {

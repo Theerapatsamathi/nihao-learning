@@ -1,4 +1,5 @@
-// Pure testable logic for Multiplayer Arena (seeded duel quiz, speed score, avatars, titles)
+// Pure testable logic for Multiplayer Arena:
+// Seeded duel quiz, Tone Sniper, Hanzi Speed Draw, Boss Raid damage, Shareable Battle Card data, Avatars & Titles
 
 export const PANDA_AVATARS = [
   { id: 'classic', emoji: '🐼', label: 'เป่าเปาคลาสสิก' },
@@ -8,7 +9,8 @@ export const PANDA_AVATARS = [
   { id: 'kungfu', emoji: '🥋', label: 'ปรมาจารย์กังฟู' },
   { id: 'boba', emoji: '🧋', label: 'สายชานม' },
   { id: 'lantern', emoji: '🏮', label: 'สายตรุษจีน' },
-  { id: 'dragon', emoji: '🐉', label: 'มังกรทอง' }
+  { id: 'dragon', emoji: '🐉', label: 'มังกรทอง' },
+  { id: 'slayer', emoji: '⚡', label: 'ผู้พิชิตมังกรหยก (Raid)' }
 ];
 
 export const ARENA_TITLES = [
@@ -17,7 +19,8 @@ export const ARENA_TITLES = [
   'มือไวอันดับ 1',
   'นักคัดลายมือ',
   'สายชานมเซี่ยงไฮ้',
-  'เทพ HSK 1'
+  'เทพ HSK 1',
+  'อัศวินปราบมังกรหยก 🐉'
 ];
 
 export const DUEL_BANK = {
@@ -58,6 +61,32 @@ export const DUEL_BANK = {
     { q: '我是泰国人', a: 'ฉันเป็นคนไทย', opts: ['ฉันเป็นคนไทย', 'คุณชื่ออะไร', 'ยินดีที่ได้รู้จัก', 'ฉันสบายดี'] },
     { q: '太贵了！', a: 'แพงเกินไปแล้ว!', opts: ['แพงเกินไปแล้ว!', 'ถูกมากเลย!', 'อร่อยมาก!', 'ไกลเกินไป!'] },
     { q: '没关系', a: 'ไม่เป็นไร', opts: ['ไม่เป็นไร', 'ขอโทษ', 'ขอบคุณ', 'ลาก่อน'] }
+  ],
+  // NEW Mode 1: Tone Sniper (ฟังเสียงเร็วแล้วแย่งกดวรรณยุกต์ 1–4)
+  'tone-sniper': [
+    { q: '🎧 ฟังเสียงพยางค์แรกแล้วกดวรรณยุกต์! (ความหมาย: แม่)', audioText: '妈', mode: 'tone-sniper', a: 'เสียง 1 (ˉ สามัญสูง)', opts: ['เสียง 1 (ˉ สามัญสูง)', 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', 'เสียง 4 (ˋ โททุบลง)'] },
+    { q: '🎧 ฟังเสียงแล้วกดวรรณยุกต์! (ความหมาย: ม้า)', audioText: '马', mode: 'tone-sniper', a: 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', opts: ['เสียง 1 (ˉ สามัญสูง)', 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', 'เสียง 4 (ˋ โททุบลง)'] },
+    { q: '🎧 ฟังเสียงแล้วกดวรรณยุกต์! (ความหมาย: ดุ/ด่า)', audioText: '骂', mode: 'tone-sniper', a: 'เสียง 4 (ˋ โททุบลง)', opts: ['เสียง 1 (ˉ สามัญสูง)', 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', 'เสียง 4 (ˋ โททุบลง)'] },
+    { q: '🎧 ฟังเสียงแล้วกดวรรณยุกต์! (ความหมาย: ชา)', audioText: '茶', mode: 'tone-sniper', a: 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', opts: ['เสียง 1 (ˉ สามัญสูง)', 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', 'เสียง 4 (ˋ โททุบลง)'] },
+    { q: '🎧 ฟังเสียงแล้วกดวรรณยุกต์! (ความหมาย: น้ำ)', audioText: '水', mode: 'tone-sniper', a: 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', opts: ['เสียง 1 (ˉ สามัญสูง)', 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', 'เสียง 4 (ˋ โททุบลง)'] },
+    { q: '🎧 ฟังเสียงแล้วกดวรรณยุกต์! (ความหมาย: กิน)', audioText: '吃', mode: 'tone-sniper', a: 'เสียง 1 (ˉ สามัญสูง)', opts: ['เสียง 1 (ˉ สามัญสูง)', 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', 'เสียง 4 (ˋ โททุบลง)'] },
+    { q: '🎧 ฟังเสียงแล้วกดวรรณยุกต์! (ความหมาย: ไป)', audioText: '去', mode: 'tone-sniper', a: 'เสียง 4 (ˋ โททุบลง)', opts: ['เสียง 1 (ˉ สามัญสูง)', 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', 'เสียง 4 (ˋ โททุบลง)'] },
+    { q: '🎧 ฟังเสียงแล้วกดวรรณยุกต์! (ความหมาย: คน)', audioText: '人', mode: 'tone-sniper', a: 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', opts: ['เสียง 1 (ˉ สามัญสูง)', 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', 'เสียง 4 (ˋ โททุบลง)'] },
+    { q: '🎧 ฟังเสียงแล้วกดวรรณยุกต์! (ความหมาย: ใหญ่)', audioText: '大', mode: 'tone-sniper', a: 'เสียง 4 (ˋ โททุบลง)', opts: ['เสียง 1 (ˉ สามัญสูง)', 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', 'เสียง 4 (ˋ โททุบลง)'] },
+    { q: '🎧 ฟังเสียงแล้วกดวรรณยุกต์! (ความหมาย: หนังสือ)', audioText: '书', mode: 'tone-sniper', a: 'เสียง 1 (ˉ สามัญสูง)', opts: ['เสียง 1 (ˉ สามัญสูง)', 'เสียง 2 (ˊ จัตวาพุ่งขึ้น)', 'เสียง 3 (ˇ เอกต่ำตก-ขึ้น)', 'เสียง 4 (ˋ โททุบลง)'] }
+  ],
+  // NEW Mode 2: Hanzi Speed Draw (แข่งเขียนตัวจีนตามคำแปล ใครลากลำดับขีดถูกและไวกว่าชนะ!)
+  'speed-draw': [
+    { q: '✍️ เขียนอักษรจีนคำว่า: "คน" (rén)', char: '人', mode: 'speed-draw', a: '人', opts: ['人', '入', '大', '八'] },
+    { q: '✍️ เขียนอักษรจีนคำว่า: "ใหญ่" (dà)', char: '大', mode: 'speed-draw', a: '大', opts: ['大', '太', '天', '木'] },
+    { q: '✍️ เขียนอักษรจีนคำว่า: "ปาก" (kǒu)', char: '口', mode: 'speed-draw', a: '口', opts: ['口', '日', '月', '田'] },
+    { q: '✍️ เขียนอักษรจีนคำว่า: "พระอาทิตย์ / วัน" (rì)', char: '日', mode: 'speed-draw', a: '日', opts: ['日', '目', '口', '白'] },
+    { q: '✍️ เขียนอักษรจีนคำว่า: "ต้นไม้" (mù)', char: '木', mode: 'speed-draw', a: '木', opts: ['木', '本', '林', '十'] },
+    { q: '✍️ เขียนอักษรจีนคำว่า: "น้ำ" (shuǐ)', char: '水', mode: 'speed-draw', a: '水', opts: ['水', '火', '小', '永'] },
+    { q: '✍️ เขียนอักษรจีนคำว่า: "ไฟ" (huǒ)', char: '火', mode: 'speed-draw', a: '火', opts: ['火', '水', '人', '山'] },
+    { q: '✍️ เขียนอักษรจีนคำว่า: "ภูเขา" (shān)', char: '山', mode: 'speed-draw', a: '山', opts: ['山', '出', '口', '川'] },
+    { q: '✍️ เขียนอักษรจีนคำว่า: "สิบ (10)" (shí)', char: '十', mode: 'speed-draw', a: '十', opts: ['十', '七', '千', '土'] },
+    { q: '✍️ เขียนอักษรจีนคำว่า: "ผู้หญิง / ลูกสาว" (nǚ)', char: '女', mode: 'speed-draw', a: '女', opts: ['女', '好', '子', '妈'] }
   ]
 };
 
@@ -72,14 +101,28 @@ export function mulberry32(seed) {
   };
 }
 
-export function buildSeededDuelQuestions(topic = 'vocab', seed = 12345, count = 10) {
-  const bank = DUEL_BANK[topic] || DUEL_BANK.vocab;
+export function buildSeededDuelQuestions(topic = 'vocab', seed = 12345, count = 10, customQuestions = null) {
   const rng = mulberry32(seed);
+  if (Array.isArray(customQuestions) && customQuestions.length >= 4) {
+    return customQuestions.slice(0, count).map(item => ({
+      q: item.q,
+      a: item.a,
+      mode: item.mode || 'choice',
+      audioText: item.audioText || '',
+      char: item.char || '',
+      opts: [...(item.opts || [])].sort(() => rng() - 0.5)
+    }));
+  }
+  const bank = DUEL_BANK[topic] || DUEL_BANK.vocab;
   const shuffled = [...bank].sort(() => rng() - 0.5).slice(0, Math.min(count, bank.length));
   return shuffled.map(item => ({
     q: item.q,
     a: item.a,
-    opts: [...item.opts].sort(() => rng() - 0.5)
+    mode: item.mode || 'choice',
+    audioText: item.audioText || '',
+    char: item.char || '',
+    // Keep Tone 1->4 in natural order for tone-sniper so muscle memory is clean
+    opts: item.mode === 'tone-sniper' ? [...item.opts] : [...item.opts].sort(() => rng() - 0.5)
   }));
 }
 
@@ -88,4 +131,12 @@ export function calcDuelPoints(isCorrect, elapsedMs) {
   const sec = Math.max(0, Number(elapsedMs || 0) / 1000);
   const speedBonus = Math.max(0, Math.round((8 - sec) * 10));
   return 100 + speedBonus;
+}
+
+export function calcRaidBossDamage(isCorrect, combo = 1, elapsedMs = 3000) {
+  if (!isCorrect) return 0;
+  const base = 180;
+  const comboMult = Math.min(3.0, 1 + Math.max(0, combo - 1) * 0.25);
+  const speedBonus = elapsedMs < 3500 ? 60 : elapsedMs < 6000 ? 25 : 0;
+  return Math.round((base + speedBonus) * comboMult);
 }
