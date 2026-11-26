@@ -78,6 +78,8 @@ function base64PCM24kToFloat32(b64) {
 
 export function renderLiveVoiceCallRunner(core, host, onExit) {
   let roleIdx = 0;
+  let noThaiMode = false;
+  let noThaiRewarded = false;
   let callState = 'idle'; // 'idle' | 'connecting' | 'live' | 'error'
   let muted = false;
   let aiSpeaking = false;
@@ -166,6 +168,9 @@ export function renderLiveVoiceCallRunner(core, host, onExit) {
       ws = new WebSocket(url);
 
       ws.onopen = () => {
+        const sysText = noThaiMode
+          ? `${role.system} STRICT IMMERSION RULE: Speak 100% Mandarin Chinese ONLY. Do NOT use any Thai or English words. If the learner gets stuck, explain using simpler HSK 1-2 Mandarin words.`
+          : role.system;
         const setupMsg = {
           setup: {
             model: 'models/gemini-2.5-flash-native-audio-preview-09-2025',
@@ -176,7 +181,7 @@ export function renderLiveVoiceCallRunner(core, host, onExit) {
               }
             },
             systemInstruction: {
-              parts: [{ text: role.system }]
+              parts: [{ text: sysText }]
             }
           }
         };
@@ -196,9 +201,16 @@ export function renderLiveVoiceCallRunner(core, host, onExit) {
             seconds += 1;
             const el = host.querySelector('#lv-timer');
             if (el) {
-              const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
-              const ss = String(seconds % 60).padStart(2, '0');
-              el.textContent = `${mm}:${ss}`;
+              const displaySec = noThaiMode ? Math.max(0, 180 - seconds) : seconds;
+              const mm = String(Math.floor(displaySec / 60)).padStart(2, '0');
+              const ss = String(displaySec % 60).padStart(2, '0');
+              el.textContent = noThaiMode ? `🚫 ${mm}:${ss}` : `${mm}:${ss}`;
+            }
+            if (noThaiMode && !noThaiRewarded && seconds >= 180) {
+              noThaiRewarded = true;
+              core.addXp(50, '🏆 ผ่านภารกิจห้ามพูดไทย 3 นาทีเต็ม!');
+              core.spawnConfetti?.(30);
+              core.showToast('🏆 ยอดเยี่ยม! อยู่ครบ 3 นาทีภาษาจีนล้วน รับ +50 XP!');
             }
           }, 1000);
 
@@ -284,6 +296,13 @@ export function renderLiveVoiceCallRunner(core, host, onExit) {
             ${core.escapeHtml(statusMsg)}
           </div>
 
+          <div style="display:flex;justify-content:center;margin-bottom:12px">
+            <label class="m1-toggle-chip">
+              <input type="checkbox" id="lv-nothai-chk" ${noThaiMode ? 'checked' : ''} ${callState !== 'idle' && callState !== 'error' ? 'disabled' : ''}>
+              <span>🚫 โหมดห้ามพูดไทย 3 นาที (จีนล้วน 100% · +50 XP)</span>
+            </label>
+          </div>
+
           <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
             ${callState === 'live' || callState === 'connecting' ? `
               <button type="button" class="btn-secondary" id="lv-mute">${muted ? '🔇 ปิดไมค์อยู่ (กดเปิด)' : '🎙️ ไมค์เปิดอยู่ (กดปิด)'}</button>
@@ -316,6 +335,11 @@ export function renderLiveVoiceCallRunner(core, host, onExit) {
       const val = host.querySelector('#lv-key-in')?.value || '';
       setSavedGeminiKey(val);
       core.showToast(val.trim() ? '💾 บันทึก Gemini API Key ในเครื่องเรียบร้อยแล้ว' : 'ลบ API Key ออกแล้ว');
+      render();
+    });
+    host.querySelector('#lv-nothai-chk')?.addEventListener('change', (e) => {
+      noThaiMode = Boolean(e.target.checked);
+      noThaiRewarded = false;
       render();
     });
     host.querySelector('#lv-call')?.addEventListener('click', () => {

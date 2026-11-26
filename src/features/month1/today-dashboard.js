@@ -33,6 +33,7 @@ import { openQuickDict } from './quick-dict.js';
 import { isLargeHanziEnabled, setLargeHanziEnabled } from './ux-utils.js';
 import { renderToneCoachRunner } from './tone-coach.js';
 import { renderLiveVoiceCallRunner } from './live-voice-call.js';
+import { renderShadowing3RoundRunner, renderAudioLoopRunner, renderBedtime3MinRunner } from './immersion-tools.js';
 
 let activeHubSection = 'practice'; // 'practice' | 'realworld' | 'tools'
 
@@ -168,6 +169,20 @@ export function renderTodayDashboard(core, host) {
             <div style="font-weight:700;margin:6px 0 4px">กราฟวรรณยุกต์สด + โค้ชแก้สำเนียง</div>
             <div class="m1-muted" style="font-size:12px;margin-bottom:10px">วาดเส้นเสียงทับเจ้าของภาษา พร้อมแนะนำตำแหน่งลิ้น พ่นลม และกฎผันเสียงละเอียด</div>
             <button type="button" class="btn-primary m1-mini-btn" id="td-go-tone-coach-card">📈 เปิดโค้ชตรวจเสียง →</button>
+          </div>
+
+          <div class="m1-day-card">
+            <span class="m1-tag">🔁 Shadowing 3 รอบ</span>
+            <div style="font-weight:700;margin:6px 0 4px">ฟัง → พูดทับเสียง → ปิดตาพูดเอง</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ฝึกครบ 3 รอบต่อประโยคให้ปากจำจังหวะภาษาจีนอัตโนมัติ</div>
+            <button type="button" class="btn-primary m1-mini-btn" id="td-go-shadow3">🔁 เริ่ม Shadowing 3 รอบ →</button>
+          </div>
+
+          <div class="m1-day-card">
+            <span class="m1-tag">🎧 Hands-Free Loop</span>
+            <div style="font-weight:700;margin:6px 0 4px">ฟังวนตอนเดินทาง / อาบน้ำ</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">เล่นวนอัตโนมัติ: จีนปกติ → เว้น 3 วิพูดตาม → จีนช้า 0.75x</div>
+            <button type="button" class="btn-primary m1-mini-btn" id="td-go-audioloop">🎧 เปิดเครื่องเล่นฟังวน →</button>
           </div>
 
           <div class="m1-day-card">
@@ -320,6 +335,8 @@ export function renderTodayDashboard(core, host) {
   host.querySelector('#td-go-live-call')?.addEventListener('click', () => renderLiveVoiceCallRunner(core, host, redrawSelf));
   host.querySelector('#td-go-tone-coach')?.addEventListener('click', () => renderToneCoachRunner(core, host, redrawSelf));
   host.querySelector('#td-go-tone-coach-card')?.addEventListener('click', () => renderToneCoachRunner(core, host, redrawSelf));
+  host.querySelector('#td-go-shadow3')?.addEventListener('click', () => renderShadowing3RoundRunner(core, host, redrawSelf));
+  host.querySelector('#td-go-audioloop')?.addEventListener('click', () => renderAudioLoopRunner(core, host, redrawSelf));
   host.querySelector('#td-go-reflex')?.addEventListener('click', () => renderReflexSpeakingRunner(core, host, redrawSelf));
   host.querySelector('#td-go-weakness')?.addEventListener('click', () => renderWeaknessGrinder(core, host, redrawSelf));
   host.querySelectorAll('[data-boss-cp]').forEach(b => b.addEventListener('click', () => {
@@ -352,7 +369,7 @@ export function renderTodayDashboard(core, host) {
     core.switchTab('vocab');
   });
   host.querySelector('#td-go-bedtime')?.addEventListener('click', () => {
-    if (typeof core.openVocabBedtimeReview === 'function') core.openVocabBedtimeReview();
+    renderBedtime3MinRunner(core, host, redrawSelf);
   });
   host.querySelector('#td-go-copybook')?.addEventListener('click', () => core.switchTab('copybook'));
   host.querySelector('#td-go-lyrics')?.addEventListener('click', () => {
