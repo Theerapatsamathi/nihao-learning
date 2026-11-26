@@ -3,6 +3,8 @@
 import {
   DAILY_MASTERY_PASS_PCT,
   WEEKLY_BOSS_DAYS,
+  normalizeIntensity,
+  getIntensityConfig,
   calcMonth1Stats,
   calc90DayStats,
   getTodayBlueprintDay,
@@ -49,6 +51,8 @@ export function renderTodayDashboard(core, host) {
   const dueVocabSrs = typeof core.getDueVocabSrsCount === 'function' ? core.getDueVocabSrsCount() : 0;
   const totalDueCards = dueM1Fsrs.length + dueVocabSrs;
   const beginnerOn = Boolean(ext.beginnerMode);
+  const intensityLv = normalizeIntensity(ext.intensity || 1);
+  const intensityCfg = getIntensityConfig(intensityLv);
   const largeHanziOn = isLargeHanziEnabled();
   const rwp = realWorldProgress(ext.realWorld);
 
@@ -108,7 +112,12 @@ export function renderTodayDashboard(core, host) {
           <button type="button" class="btn-secondary" id="td-go-tone-coach">📈 โค้ชตรวจการออกเสียง</button>
           <button type="button" class="btn-secondary" id="td-open-dict">🔍 ค้นศัพท์ (/)</button>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center">
+          <div class="m1-chip-row" role="group" aria-label="ระดับความเข้มข้น">
+            <button type="button" class="m1-chip ${intensityLv === 1 ? 'active' : ''}" data-set-intensity="1">1x ปกติ</button>
+            <button type="button" class="m1-chip ${intensityLv === 5 ? 'active' : ''}" data-set-intensity="5">🔥 5x เข้มข้น</button>
+            <button type="button" class="m1-chip ${intensityLv === 10 ? 'active' : ''}" data-set-intensity="10">💀 10x โหดจัด</button>
+          </div>
           <label class="m1-toggle-chip">
             <input type="checkbox" id="td-beginner-chk" ${beginnerOn ? 'checked' : ''}>
             <span>โหมดโฟกัสมือใหม่</span>
@@ -324,6 +333,12 @@ export function renderTodayDashboard(core, host) {
   host.querySelector('#td-go-m1fsrs')?.addEventListener('click', () => {
     renderFsrsQuizGate(core, host, { onCleared: redrawSelf, onExit: redrawSelf });
   });
+  host.querySelectorAll('[data-set-intensity]').forEach(b => b.addEventListener('click', () => {
+    const lv = normalizeIntensity(b.dataset.setIntensity);
+    core.setExt('month1', { intensity: lv }, { save: true });
+    core.showToast(`ตั้งความเข้มข้นเป็น ${getIntensityConfig(lv).label} แล้ว!`);
+    redrawSelf();
+  }));
   host.querySelector('#td-open-dict')?.addEventListener('click', () => openQuickDict(core));
   host.querySelector('#td-beginner-chk')?.addEventListener('change', (e) => {
     toggleBeginnerMode(core, e.target.checked);

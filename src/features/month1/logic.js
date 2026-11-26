@@ -10,6 +10,24 @@ export const EXAM_SPEAK_COUNT = 3;
 export const EXAM_SPEAK_MAX_PER_ITEM = 2;
 export const EXAM_TOTAL_POINTS = EXAM_QUIZ_COUNT + EXAM_SPEAK_COUNT * EXAM_SPEAK_MAX_PER_ITEM; // 20 points (19/20 = 95%)
 
+export function normalizeIntensity(v) {
+  const n = Number(v);
+  if (n >= 10) return 10;
+  if (n >= 5) return 5;
+  return 1;
+}
+
+export function getIntensityConfig(intensity = 1) {
+  const lv = normalizeIntensity(intensity);
+  if (lv === 10) {
+    return { level: 10, label: '💀 10x โหดจัด (Bootcamp)', speakCount: 30, toneCount: 12, extraQuiz: 30, speakExamCount: 10, hidePinyin: true, xpMult: 3 };
+  }
+  if (lv === 5) {
+    return { level: 5, label: '🔥 5x เข้มข้น', speakCount: 18, toneCount: 8, extraQuiz: 16, speakExamCount: 6, hidePinyin: false, xpMult: 2 };
+  }
+  return { level: 1, label: '1x ปกติ', speakCount: 5, toneCount: 4, extraQuiz: 0, speakExamCount: 3, hidePinyin: false, xpMult: 1 };
+}
+
 export function stripTones(str) {
   return String(str || '')
     .replace(/[üǖǘǚǜ]/gi, 'v')
@@ -127,8 +145,9 @@ export function calcMonth1Stats(progress = {}, ext = {}) {
   };
 }
 
-export function buildGuidedSession(dayNum, mistakes = []) {
+export function buildGuidedSession(dayNum, mistakes = [], { intensity = 1 } = {}) {
   const safeDay = Math.max(1, Math.min(MAX_CURRICULUM_DAY, Number(dayNum) || 1));
+  const icfg = getIntensityConfig(intensity);
   const advDay = safeDay >= 31 ? getAdvancedDayData(safeDay) : null;
   const prevAdvDay = safeDay >= 32 ? getAdvancedDayData(safeDay - 1) : null;
 
@@ -191,17 +210,17 @@ export function buildGuidedSession(dayNum, mistakes = []) {
     return { day: safeDay, meta: dayMeta, warmup, toneFocus, speakItems, mnemFocus };
   }
 
-  // Step 2: 4 tone-pair focus items for today (Month 1)
+  // Step 2: Tone-pair focus items for today (Month 1, scaled by intensity)
   const pairStart = ((safeDay - 1) * 2) % TONE_PAIRS.length;
   const toneFocus = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < icfg.toneCount; i++) {
     toneFocus.push(TONE_PAIRS[(pairStart + i) % TONE_PAIRS.length]);
   }
 
-  // Step 3: 5 survival sentences to shadow/speak (Month 1)
+  // Step 3: Survival sentences to shadow/speak (Month 1, scaled by intensity)
   const survStart = ((safeDay - 1) * 5) % SURVIVAL_50.length;
   const speakItems = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < icfg.speakCount; i++) {
     speakItems.push(SURVIVAL_50[(survStart + i) % SURVIVAL_50.length]);
   }
 
@@ -309,10 +328,11 @@ export function tokenizeSentenceForOrder(hzStr, pyStr = '', dayNum = 1) {
  * - 3 real speaking prompts WITH Pinyin + 1 reference audio replay allowed per prompt (2 pts each = 6 pts)
  * Passing requires >= 95% (>= 19.0 / 20 points).
  */
-export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = [], seed = Date.now() } = {}) {
+export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = [], seed = Date.now(), intensity = 1 } = {}) {
   const safeDay = Math.max(1, Math.min(MAX_CURRICULUM_DAY, Number(dayNum) || 1));
-  const rng = seededRng(seed + safeDay * 97);
-  const session = buildGuidedSession(safeDay, mistakes);
+  const icfg = getIntensityConfig(intensity);
+  const rng = seededRng(seed + safeDay * 97 + icfg.level * 31);
+  const session = buildGuidedSession(safeDay, mistakes, { intensity: icfg.level });
   const questions = [];
 
   const pickDistractors = (pool, excludeKey, getKey, count = 3) => {
@@ -473,26 +493,52 @@ export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = []
     });
   });
 
-  // Ensure exact EXAM_QUIZ_COUNT (14) shuffled questions
-  const finalQuestions = shuffleWithRng(questions.slice(0, EXAM_QUIZ_COUNT), rng);
+  // Hardcore 5x / 10x extra closed-book listening & recall questions
+  if (icfg.extraQuiz > 0) {
+    const extraPool = shuffleWithRng([...session.speakItems, ...SURVIVAL_50], rng);
+    for (let i = 0; i < icfg.extraQuiz; i++) {
+      const target = extraPool[i % extraPool.length];
+      const distractors = pickDistractors(SURVIVAL_50, target.th, x => x.th, 3);
+      const opts = shuffleWithRng([target.th, ...distractors.map(d => d.th)], rng);
+      const isEar = i % 2 === 0;
+      const displayTerm = icfg.hidePinyin ? target.hz : formatHzWithProgressivePinyin(target.hz, target.py, Math.max(safeDay, 23));
+      questions.push({
+        id: `hc-${icfg.level}x-${i}`,
+        kind: 'choice',
+        category: `${icfg.label} · ${isEar ? 'ฟังล้วน' : 'อ่านจีนจริง'}`,
+        prompt: isEar ? 'กดฟังเสียงภาษาจีน แล้วเลือกความหมายที่ถูกต้อง' : `ประโยค "${displayTerm}" แปลว่าอะไร?`,
+        audioHz: target.hz.replace(/…/g, ''),
+        hidePromptHz: isEar,
+        options: opts,
+        answer: opts.indexOf(target.th),
+        refItem: { hz: target.hz, py: target.py, th: target.th },
+        explain: `${target.hz} (${target.py}) = ${target.th}`
+      });
+    }
+  }
 
-  // 5) 3 Real Speaking Exam Items (shows Pinyin + allows 1 reference audio listen before recording!)
+  const targetQuizCount = EXAM_QUIZ_COUNT + icfg.extraQuiz;
+  const finalQuestions = shuffleWithRng(questions.slice(0, targetQuizCount), rng);
+
+  // 5) Real Speaking Exam Items (scaled by intensity: 3 / 6 / 10)
   const cleanSpeakCandidates = session.speakItems
     .map(s => ({
       hz: s.hz.replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim(),
-      py: s.py.replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim(),
+      py: icfg.hidePinyin ? '' : s.py.replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim(),
       th: s.th,
       tip: s.tip
     }))
     .filter(s => normalizeChinese(s.hz).length >= 2);
 
-  const speakingPrompts = shuffleWithRng(cleanSpeakCandidates, rng).slice(0, EXAM_SPEAK_COUNT);
+  const speakingPrompts = shuffleWithRng(cleanSpeakCandidates, rng).slice(0, icfg.speakExamCount);
+  const totalPoints = finalQuestions.length + speakingPrompts.length * EXAM_SPEAK_MAX_PER_ITEM;
 
   return {
     day: safeDay,
-    scaffoldingTier: safeDay <= 14 ? 'full-pinyin' : (safeDay <= 22 ? 'partial-fade' : 'core-fade'),
+    intensity: icfg.level,
+    scaffoldingTier: icfg.hidePinyin ? 'no-pinyin-10x' : (safeDay <= 14 ? 'full-pinyin' : (safeDay <= 22 ? 'partial-fade' : 'core-fade')),
     passPct: DAILY_MASTERY_PASS_PCT,
-    totalPoints: EXAM_TOTAL_POINTS,
+    totalPoints,
     questions: finalQuestions,
     speakingPrompts
   };

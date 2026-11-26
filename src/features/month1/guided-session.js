@@ -97,10 +97,12 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
     }
   };
 
+  const intensityLv = Number(core.getExt('month1')?.intensity) || 1;
   const exam = buildDailyMasteryExam(dayNum, {
     planDayObj: getPlanDayObj(dayNum),
     mistakes: core.state.progress.mistakes || [],
-    seed: Date.now()
+    seed: Date.now(),
+    intensity: intensityLv
   });
 
   let phase = 'quiz'; // 'quiz' | 'speak' | 'result'
@@ -708,7 +710,8 @@ export function renderGuidedRunner(core, host, onDone, opts = {}) {
     return;
   }
 
-  const session = buildGuidedSession(day, core.state.progress.mistakes || []);
+  const intensityLv = Number(core.getExt('month1')?.intensity) || 1;
+  const session = buildGuidedSession(day, core.state.progress.mistakes || [], { intensity: intensityLv });
   let step = 0; // 0: closed-book warmup recall, 1: tone pairs, 2: speak 5 + mic practice, 3: 95% mastery exam
   const checkedWarmup = new Set();
   const listenedTones = new Set();
