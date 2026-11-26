@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nihao-cache-v30';
+const CACHE_NAME = 'nihao-cache-v31';
 const AUDIO_CACHE = 'nihao-audio-v1';
 const META_CACHE = 'nihao-meta-v1';
 const PRESERVED_CACHES = new Set([CACHE_NAME, AUDIO_CACHE, META_CACHE]);

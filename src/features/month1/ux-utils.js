@@ -186,4 +186,26 @@ export function initUxEnhancements(core) {
     }
     syncActive('today');
   }
+
+  // 3. Global Auto Tone-Coloring for Pinyin elements across all tabs
+  const PY_SELECTORS = '.m1-py, .m1-dict-py, .m1-tile-py, .py, .pinyin, .vocab-py, .example-py, .pair-py, .inspector-reading, .tone-pinyin';
+  const applyToneColorsToDom = () => {
+    document.querySelectorAll(PY_SELECTORS).forEach((el) => {
+      if (el.dataset.uxToneDone === '1' || el.querySelector('.ux-tone')) return;
+      if (el.children.length > 0) return;
+      const txt = el.textContent || '';
+      if (!/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/i.test(txt)) return;
+      el.innerHTML = colorizePinyin(txt);
+      el.dataset.uxToneDone = '1';
+    });
+  };
+  applyToneColorsToDom();
+  if (!window.__nihaoToneObserver) {
+    let timer = null;
+    window.__nihaoToneObserver = new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(applyToneColorsToDom, 80);
+    });
+    window.__nihaoToneObserver.observe(document.body, { childList: true, subtree: true });
+  }
 }
