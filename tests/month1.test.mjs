@@ -50,3 +50,89 @@ import { extractChineseChars } from '../src/features/month1/copybook.js';
 test('extractChineseChars deduplicates and filters only Hanzi', () => {
   assert.deepEqual(extractChineseChars('你好! 你好 123 谢谢'), ['你', '好', '谢']);
 });
+
+import {
+  DAILY_MASTERY_PASS_PCT,
+  EXAM_TOTAL_POINTS,
+  isDayMastered,
+  buildDailyMasteryExam,
+  gradeSpeakingExamItem,
+  evaluateDailyMasteryAttempt
+} from '../src/features/month1/logic.js';
+
+test('Daily Mastery Gate: requires strict >= 95% to complete a day and unlock next day', () => {
+  assert.equal(DAILY_MASTERY_PASS_PCT, 95);
+  assert.equal(EXAM_TOTAL_POINTS, 20);
+
+  // 18.5 / 20 = 92.5% -> MUST FAIL (not finished!)
+  const failAttempt = evaluateDailyMasteryAttempt({ quizCorrect: 13, quizTotal: 14, speakingPoints: 5.5, speakingMax: 6 });
+  assert.equal(failAttempt.pct, 92.5);
+  assert.equal(failAttempt.passed, false);
+  assert.equal(failAttempt.neededPoints, 0.5);
+
+  // 19.0 / 20 = 95.0% -> PASS!
+  const passAttempt = evaluateDailyMasteryAttempt({ quizCorrect: 13, quizTotal: 14, speakingPoints: 6, speakingMax: 6 });
+  assert.equal(passAttempt.pct, 95);
+  assert.equal(passAttempt.passed, true);
+  assert.equal(passAttempt.neededPoints, 0);
+
+  // Day 1 scored 90% -> still locked on Day 1!
+  const extFail = {
+    dayMastery: {
+      1: { bestPct: 90, lastPct: 90, attempts: 2, passed: false }
+    }
+  };
+  assert.equal(isDayMastered(1, {}, extFail), false);
+  assert.equal(getTodayBlueprintDay({}, extFail), 1);
+
+  // Once Day 1 scores 95% -> advances to Day 2!
+  const extPass = {
+    dayMastery: {
+      1: { bestPct: 95, lastPct: 95, attempts: 3, passed: true }
+    }
+  };
+  assert.equal(isDayMastered(1, {}, extPass), true);
+  assert.equal(getTodayBlueprintDay({}, extPass), 2);
+});
+
+test('buildDailyMasteryExam & gradeSpeakingExamItem verify closed-book recall, order, and speech', () => {
+  const examA = buildDailyMasteryExam(3, { seed: 101 });
+  const examB = buildDailyMasteryExam(3, { seed: 202 });
+  assert.equal(examA.questions.length, 14);
+  assert.equal(examA.speakingPrompts.length, 3);
+  assert.ok(examA.questions.some(q => q.kind === 'order' && Array.isArray(q.tiles) && q.tiles.length >= 2));
+  assert.notDeepEqual(examA.questions.map(q => q.id), examB.questions.map(q => q.id));
+
+  // Mic pronunciation grading
+  const exactMic = gradeSpeakingExamItem({
+    targetHz: '我是泰国人',
+    targetPy: 'Wǒ shì Tàiguórén.',
+    heardText: '我是泰国人'
+  });
+  assert.equal(exactMic.points, 2);
+  assert.equal(exactMic.passedItem, true);
+
+  const wrongMic = gradeSpeakingExamItem({
+    targetHz: '我是泰国人',
+    targetPy: 'Wǒ shì Tàiguórén.',
+    heardText: '你好'
+  });
+  assert.equal(wrongMic.points, 0);
+  assert.equal(wrongMic.passedItem, false);
+
+  // Tone-numbered pinyin fallback grading (requires exact tones for full credit)
+  const exactPy = gradeSpeakingExamItem({
+    targetHz: '你好',
+    targetPy: 'nǐ hǎo',
+    typedPinyinFallback: 'ni3 hao3'
+  });
+  assert.equal(exactPy.points, 2);
+
+  const tonelessPy = gradeSpeakingExamItem({
+    targetHz: '你好',
+    targetPy: 'nǐ hǎo',
+    typedPinyinFallback: 'ni hao'
+  });
+  assert.equal(tonelessPy.points, 1);
+  assert.equal(tonelessPy.passedItem, false);
+});

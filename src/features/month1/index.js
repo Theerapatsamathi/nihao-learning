@@ -1,7 +1,7 @@
 // Month-1 Starter Pack + Unified Today Dashboard + Copybook entry point
 import './style.css';
 import { initQuickDictionary } from './quick-dict.js';
-import { applyBeginnerMode } from './guided-session.js';
+import { applyBeginnerMode, renderGuidedRunner, renderExamOnlyRunner } from './guided-session.js';
 import { renderMonth1Tab } from './views.js';
 import { renderCopybookTab } from './copybook.js';
 import { renderTodayDashboard } from './today-dashboard.js';
@@ -9,6 +9,8 @@ import { renderTodayDashboard } from './today-dashboard.js';
 const core = window.NihaoCore;
 
 if (core) {
+  window.__nihaoRenderGuidedDay = (host, dayNum, onDone) => renderGuidedRunner(core, host, onDone, { targetDay: dayNum });
+  window.__nihaoRenderMasteryExam = (host, dayNum, onDone) => renderExamOnlyRunner(core, host, dayNum, onDone);
   core.registerTab({
     id: 'today',
     label: 'หน้าแรกวันนี้',
@@ -57,18 +59,40 @@ if (core) {
   initQuickDictionary(core);
 
   // Land users on the clean Unified Today Hub by default (unless deep-linked to ?duel=CODE)
-  core.on('features-ready', () => {
-    const ext = core.getExt('month1');
+  const ensureMasteryInitialized = () => {
+    const ext = core.getExt('month1') || {};
     const p = core.state.progress || {};
     const hasActivity = Object.keys(p.dayScores || {}).length > 0 || Object.keys(p.activity || {}).length > 0;
+    const nextPatch = {};
+    let changed = false;
     if (!ext.welcomed) {
-      core.setExt('month1', { welcomed: true, beginnerMode: !hasActivity }, { save: false });
+      nextPatch.welcomed = true;
+      nextPatch.beginnerMode = !hasActivity;
+      changed = true;
     }
+    if (!ext.dayMastery || typeof ext.dayMastery !== 'object') {
+      const migrated = {};
+      for (const [k, score] of Object.entries(p.dayScores || {})) {
+        if (Number(score) >= 10) {
+          migrated[k] = { bestPct: 100, lastPct: 100, attempts: 1, passed: true, updatedAt: Date.now() };
+        }
+      }
+      nextPatch.dayMastery = migrated;
+      changed = true;
+    }
+    if (changed) {
+      core.setExt('month1', nextPatch, { save: false });
+    }
+  };
+
+  core.on('features-ready', () => {
+    ensureMasteryInitialized();
     const hasDuelParam = new URLSearchParams(window.location.search).has('duel');
     if (!hasDuelParam) {
       core.switchTab('today');
     }
     applyBeginnerMode(core);
   });
+  core.on('cloud-synced', () => ensureMasteryInitialized());
   setTimeout(() => applyBeginnerMode(core), 200);
 }

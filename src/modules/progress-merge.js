@@ -134,8 +134,40 @@ export function mergeCloudProgressData(localP, cloudP) {
   merged.vocabRainBest = Math.max(localP.vocabRainBest || 0, cloudP.vocabRainBest || 0);
   merged.vocabQuizCount = Math.max(localP.vocabQuizCount || 0, cloudP.vocabQuizCount || 0);
 
-  // Feature plugin namespaces: newest namespace object wins (by updatedAt)
+  // Feature plugin namespaces: newest namespace object wins (by updatedAt), with deep merge for month1 mastery
   merged.ext = mergeTimestampedMap(localP.ext || {}, cloudP.ext || {}, () => 0);
+  if (localP.ext?.month1 || cloudP.ext?.month1) {
+    const mLocal = localP.ext?.month1 || {};
+    const mCloud = cloudP.ext?.month1 || {};
+    const mergedM1 = { ...(merged.ext.month1 || {}) };
+    mergedM1.doneDays = uniqArr(mLocal.doneDays, mCloud.doneDays);
+    mergedM1.tonePairsDone = uniqArr(mLocal.tonePairsDone, mCloud.tonePairsDone);
+    mergedM1.mnemonicsDone = uniqArr(mLocal.mnemonicsDone, mCloud.mnemonicsDone);
+    mergedM1.survivalDone = uniqArr(mLocal.survivalDone, mCloud.survivalDone);
+    if (mLocal.dayMastery || mCloud.dayMastery) {
+      const dm = {};
+      const allDays = new Set([
+        ...Object.keys(mLocal.dayMastery || {}),
+        ...Object.keys(mCloud.dayMastery || {})
+      ]);
+      for (const k of allDays) {
+        const a = mLocal.dayMastery?.[k] || {};
+        const b = mCloud.dayMastery?.[k] || {};
+        const newer = (Number(b.updatedAt) || 0) >= (Number(a.updatedAt) || 0) ? b : a;
+        const bestPct = Math.max(Number(a.bestPct) || 0, Number(b.bestPct) || 0);
+        dm[k] = {
+          ...a,
+          ...b,
+          ...newer,
+          bestPct,
+          attempts: Math.max(Number(a.attempts) || 0, Number(b.attempts) || 0),
+          passed: Boolean(a.passed || b.passed) && bestPct >= 95
+        };
+      }
+      mergedM1.dayMastery = dm;
+    }
+    merged.ext.month1 = mergedM1;
+  }
 
   return merged;
 }

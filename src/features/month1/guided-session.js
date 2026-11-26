@@ -1,5 +1,16 @@
-// Guided Daily Session (15-min 4-step runner) & Beginner Mode Sidebar Filter
-import { buildGuidedSession, getTodayBlueprintDay } from './logic.js';
+// Guided Daily Session (4-Step Study + Strict >=95% Daily Mastery Gate) & Beginner Mode Filter
+import {
+  DAILY_MASTERY_PASS_PCT,
+  buildGuidedSession,
+  buildDailyMasteryExam,
+  gradeSpeakingExamItem,
+  evaluateDailyMasteryAttempt,
+  getTodayBlueprintDay,
+  getDayMasteryRecord
+} from './logic.js';
+import { SURVIVAL_50 } from './data-month1.js';
+import { hasSpeechRecognition, startSpeechRecognition, getCharPinyinMap, addToReviewQueue } from '../speak-studio/speech.js';
+import { scorePronunciation } from '../speak-studio/scoring.js';
 
 const BEGINNER_TABS = new Set([
   'today', 'month1', 'copybook', 'arena', 'plan', 'lesson-path', 'writing', 'vocab', 'games-reading', 'speak-studio', 'settings-plus'
@@ -22,173 +33,854 @@ export function toggleBeginnerMode(core, nextVal) {
   core.showToast(nextVal ? 'เปิดโหมดเดือนแรก (ซ่อนเมนูขั้นสูงแล้ว)' : 'แสดงเมนูทั้งหมดแล้ว');
 }
 
-export function renderGuidedRunner(core, host, onDone) {
-  const day = getTodayBlueprintDay(core.state.progress, core.getExt('month1'));
-  const session = buildGuidedSession(day, core.state.progress.mistakes || []);
-  let step = 0; // 0: warmup, 1: tone pairs, 2: speak 5, 3: finish
-  const checkedWarmup = new Set();
-  const checkedTones = new Set();
-  const checkedSpeak = new Set();
+function getPlanDayObj(dayNum) {
+  const planArr = Array.isArray(window.DAILY_PLAN_DATA) ? window.DAILY_PLAN_DATA : [];
+  return planArr.find(d => Number(d.day) === Number(dayNum)) || null;
+}
 
-  const draw = () => {
-    const pct = Math.round(((step) / 3) * 100);
-    if (step === 0) {
+function pushMissedItemToReview(core, item) {
+  if (!item || !item.hz) return;
+  try {
+    addToReviewQueue(core, {
+      hz: item.hz,
+      py: item.py || '',
+      th: item.th || '',
+      source: 'Daily Mastery Exam'
+    }, { immediate: true });
+  } catch { /* ignore */ }
+
+  const list = Array.isArray(core.state.progress.mistakes) ? core.state.progress.mistakes : [];
+  const id = `m1-${item.hz}`;
+  const existing = list.find(x => x && (x.id === id || x.hanzi === item.hz));
+  if (existing) {
+    existing.misses = (existing.misses || 1) + 1;
+    existing.streakOk = 0;
+  } else {
+    list.unshift({
+      id,
+      hanzi: item.hz,
+      pinyin: item.py || '',
+      meaning: item.th || 'ทบทวนจากสอบประจำวัน',
+      answer: item.th || item.hz,
+      misses: 1,
+      streakOk: 0
+    });
+    if (list.length > 40) list.length = 40;
+  }
+  core.state.progress.mistakes = list;
+}
+
+function renderSyllableBadges(syllables = []) {
+  if (!Array.isArray(syllables) || !syllables.length) return '';
+  return `<div class="m1-syl-row">${syllables.map(s => `
+    <span class="m1-syl-chip is-${s.status}" title="${s.reason || ''}">
+      <b class="hanzi-font">${s.char}</b>
+      <small>${s.expectedPy || ''}</small>
+    </span>
+  `).join('')}</div>`;
+}
+
+/**
+ * Shared Exam Stage Engine (14 closed-book questions + 3 real speaking items = 20 pts, >= 95% required).
+ */
+function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit, standalone = false }) {
+  let activeMic = null;
+  const stopMic = () => {
+    if (activeMic) {
+      try { activeMic.stop(); } catch { /* ignore */ }
+      activeMic = null;
+    }
+  };
+
+  const exam = buildDailyMasteryExam(dayNum, {
+    planDayObj: getPlanDayObj(dayNum),
+    mistakes: core.state.progress.mistakes || [],
+    seed: Date.now()
+  });
+
+  let phase = 'quiz'; // 'quiz' | 'speak' | 'result'
+  let qIdx = 0;
+  let quizCorrect = 0;
+  let selectedOrderIndices = [];
+  const missedItems = [];
+
+  let sIdx = 0;
+  const speakResults = new Array(exam.speakingPrompts.length).fill(null);
+  const speakTriesUsed = new Array(exam.speakingPrompts.length).fill(0);
+  let micListening = false;
+  let liveHeardText = '';
+  let liveErrorMsg = '';
+  let charPyMap = null;
+  getCharPinyinMap(core).then(m => { charPyMap = m; }).catch(() => {});
+
+  const speakSlow = (hz) => {
+    const prev = core.state.rate;
+    core.state.rate = 0.6;
+    core.speak(hz, () => { core.state.rate = prev; });
+  };
+
+  const finishAndSaveResult = () => {
+    phase = 'result';
+    const speakingPoints = speakResults.reduce((sum, r) => sum + (r ? r.points : 0), 0);
+    const evalRes = evaluateDailyMasteryAttempt({
+      quizCorrect,
+      quizTotal: exam.questions.length,
+      speakingPoints,
+      speakingMax: exam.speakingPrompts.length * 2
+    });
+
+    // Collect any failed speaking prompts into missedItems
+    exam.speakingPrompts.forEach((sp, idx) => {
+      const r = speakResults[idx];
+      if (!r || r.points < 2) {
+        missedItems.push({
+          hz: sp.hz,
+          py: sp.py,
+          th: sp.th,
+          reason: r ? `พาร์ทพูดได้ ${r.points}/2 คะแนน (${r.gradeLabel})` : 'ยังไม่ได้ออกเสียง'
+        });
+      }
+    });
+
+    const prevExt = core.getExt('month1') || {};
+    const prevRec = getDayMasteryRecord(dayNum, prevExt);
+    const wasAlreadyPassed = prevRec.passed;
+    const nextBest = Math.max(prevRec.bestPct || 0, evalRes.pct);
+    const nowPassed = wasAlreadyPassed || evalRes.passed;
+    const todayKey = core.todayKey();
+
+    // Update mistakes queue for failed items so restudy targets them
+    if (!evalRes.passed) {
+      missedItems.forEach(item => pushMissedItemToReview(core, item));
+    }
+
+    // Sync legacy dayScores (for Day 1-14) so World Map, Radar, Badges & Plan tab stay aligned with >=95% rule
+    if (dayNum >= 1 && dayNum <= 14) {
+      if (evalRes.passed) {
+        core.state.progress.dayScores[dayNum] = 10;
+      } else {
+        const cappedScore = Math.min(9, Math.floor(evalRes.pct / 10));
+        const curScore = core.state.progress.dayScores[dayNum] || 0;
+        if (!wasAlreadyPassed) {
+          core.state.progress.dayScores[dayNum] = Math.min(9, Math.max(curScore >= 10 ? 9 : curScore, cappedScore));
+        }
+      }
+    }
+
+    core.setExt('month1', (cur) => {
+      const dm = { ...(cur.dayMastery || {}) };
+      dm[dayNum] = {
+        bestPct: nextBest,
+        lastPct: evalRes.pct,
+        attempts: (prevRec.attempts || 0) + 1,
+        passed: nowPassed,
+        quizScore: `${evalRes.quizCorrect}/${evalRes.quizTotal}`,
+        speakScore: `${evalRes.speakingPoints}/${evalRes.speakingMax}`,
+        passedAt: evalRes.passed ? (prevRec.passedAt || todayKey) : (prevRec.passedAt || null),
+        updatedAt: Date.now()
+      };
+      const done = new Set(Array.isArray(cur.doneDays) ? cur.doneDays : []);
+      if (dayNum >= 15) {
+        if (nowPassed) done.add(dayNum);
+        else done.delete(dayNum);
+      }
+      return {
+        ...cur,
+        dayMastery: dm,
+        doneDays: [...done],
+        lastGuidedDate: evalRes.passed ? todayKey : cur.lastGuidedDate
+      };
+    }, { save: true, reason: evalRes.passed ? `สอบผ่าน Day ${dayNum} (${evalRes.pct}%)` : `บันทึกผลสอบ Day ${dayNum} (${evalRes.pct}%)` });
+
+    if (evalRes.passed) {
+      if (!wasAlreadyPassed) {
+        core.addXp(50, `🏆 สอบผ่าน Day ${dayNum} ด้วยคะแนน ${evalRes.pct}% (≥95%)!`);
+      } else {
+        core.addXp(10, `ทบทวนสอบผ่าน Day ${dayNum} ซ้ำ (${evalRes.pct}%)`);
+      }
+      core.spawnConfetti(42);
+      core.playChime('levelup', true);
+      core.pandaSay(`太厉害了! สอบผ่าน Day ${dayNum} ได้ ${evalRes.pct}% รู้จริงพูดได้จริง!`);
+    } else {
+      core.playChime('err', true);
+      core.pandaSay(`อีกนิดเดียว! ได้ ${evalRes.pct}% (เกณฑ์ 95%) มาทวนจุดที่พลาดแล้วสอบใหม่กัน!`);
+    }
+
+    renderResultScreen(evalRes);
+  };
+
+  const renderResultScreen = (evalRes) => {
+    const uniqueMissed = [];
+    const seenM = new Set();
+    for (const m of missedItems) {
+      const k = `${m.hz}|${m.th}`;
+      if (!seenM.has(k)) {
+        seenM.add(k);
+        uniqueMissed.push(m);
+      }
+    }
+
+    host.innerHTML = `
+      <div class="card-panel m1-runner m1-exam-result ${evalRes.passed ? 'is-pass' : 'is-fail'}">
+        <div style="text-align:center;padding:12px 8px 18px">
+          <div style="font-size:52px;line-height:1">${evalRes.passed ? '🏆' : '🔄'}</div>
+          <span class="m1-status-pill ${evalRes.passed ? 'pass' : 'fail'}" style="margin-top:10px">
+            ${evalRes.passed
+              ? `✅ ผ่านเกณฑ์มาตรฐาน ≥ ${DAILY_MASTERY_PASS_PCT}% — จบ Day ${dayNum} สมบูรณ์!`
+              : `❌ ยังไม่ผ่านเกณฑ์ ${DAILY_MASTERY_PASS_PCT}% — ถือว่ายังไม่จบ Day ${dayNum}`}
+          </span>
+          <h2 style="margin:10px 0 4px;font-size:26px" class="tabular-nums">
+            คะแนนรวม ${evalRes.pct}% (${evalRes.earnedPoints} / ${evalRes.totalPoints} คะแนน)
+          </h2>
+          <p class="m1-muted" style="margin:0 auto;max-width:540px">
+            ${evalRes.passed
+              ? `ยอดเยี่ยมมาก! คุณพิสูจน์แล้วว่าจำแม่น ฟังออก เรียงประโยคได้ และออกเสียงพูดได้จริง ปลดล็อกบทเรียนถัดไปเรียบร้อย`
+              : `ขาดอีกเพียง <b>${evalRes.neededPoints} คะแนน</b> เพื่อถึงเกณฑ์ ${DAILY_MASTERY_PASS_PCT}% ระบบบันทึกคำที่พลาดเข้าชุดทบทวนแล้ว กรุณากลับไปทบทวนเนื้อหาแล้วสอบใหม่จนกว่าจะผ่าน`}
+          </p>
+
+          <div class="m1-score-breakdown">
+            <div class="m1-score-box">
+              <span>🧠 ฟัง · ความจำ · เรียงประโยค</span>
+              <strong class="tabular-nums">${evalRes.quizCorrect} / ${evalRes.quizTotal} (${evalRes.quizPct}%)</strong>
+            </div>
+            <div class="m1-score-box">
+              <span>🎙️ พูดออกไมค์โดยไม่ดูพินอิน</span>
+              <strong class="tabular-nums">${evalRes.speakingPoints} / ${evalRes.speakingMax} (${evalRes.speakPct}%)</strong>
+            </div>
+          </div>
+        </div>
+
+        ${uniqueMissed.length > 0 ? `
+          <div class="m1-missed-panel">
+            <h4 style="margin:0 0 8px">📌 จุดที่ต้องทบทวนซ่อมก่อนสอบรอบถัดไป (${uniqueMissed.length} รายการ)</h4>
+            <div class="m1-list">
+              ${uniqueMissed.map((m, idx) => `
+                <div class="m1-item">
+                  <div>
+                    <div class="m1-hz hanzi-font">${core.escapeHtml(m.hz || '—')} ${m.py ? `<span class="m1-py">${core.escapeHtml(m.py)}</span>` : ''}</div>
+                    <div style="font-size:13.5px;font-weight:600">${core.escapeHtml(m.th || '')}</div>
+                    <div class="m1-muted" style="font-size:12px">${core.escapeHtml(m.reason || '')}</div>
+                  </div>
+                  ${m.hz ? `
+                    <div class="m1-row-btns">
+                      <button type="button" class="btn-secondary m1-mini-btn" data-miss-slow="${idx}">🐢 0.6x</button>
+                      <button type="button" class="btn-secondary m1-mini-btn" data-miss-say="${idx}">🔊 ฟัง</button>
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="m1-runner-foot" style="justify-content:center;gap:10px;flex-wrap:wrap;margin-top:20px">
+          ${evalRes.passed ? `
+            ${dayNum < 30 && onPassContinue ? `<button type="button" class="btn-primary" id="m1-res-next-day">🚀 ไปลุย Day ${dayNum + 1} ต่อเลย →</button>` : ''}
+            <button type="button" class="btn-secondary" id="m1-res-done">กลับหน้าหลัก</button>
+          ` : `
+            <button type="button" class="btn-primary" id="m1-res-restudy">📖 กลับไปเรียนทบทวนใหม่ แล้วสอบรอบถัดไป ↻</button>
+            ${standalone ? `<button type="button" class="btn-secondary" id="m1-res-retake-now">📝 สุ่มข้อสอบชุดใหม่สอบอีกครั้ง</button>` : ''}
+            <button type="button" class="btn-secondary" id="m1-res-done">พักก่อน (ยังไม่จบ Day ${dayNum})</button>
+          `}
+        </div>
+      </div>
+    `;
+
+    host.querySelectorAll('[data-miss-say]').forEach(b => {
+      b.addEventListener('click', () => {
+        const m = uniqueMissed[Number(b.dataset.missSay)];
+        if (m?.hz) core.speak(m.hz);
+      });
+    });
+    host.querySelectorAll('[data-miss-slow]').forEach(b => {
+      b.addEventListener('click', () => {
+        const m = uniqueMissed[Number(b.dataset.missSlow)];
+        if (m?.hz) speakSlow(m.hz);
+      });
+    });
+    host.querySelector('#m1-res-next-day')?.addEventListener('click', () => onPassContinue?.(dayNum + 1));
+    host.querySelector('#m1-res-restudy')?.addEventListener('click', () => {
+      if (onRestudy) onRestudy();
+      else mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit, standalone });
+    });
+    host.querySelector('#m1-res-retake-now')?.addEventListener('click', () => {
+      mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit, standalone });
+    });
+    host.querySelector('#m1-res-done')?.addEventListener('click', () => onExit?.());
+  };
+
+  const renderQuizStep = () => {
+    const q = exam.questions[qIdx];
+    const totalDoneSteps = qIdx;
+    const totalSteps = exam.questions.length + exam.speakingPrompts.length;
+    const pctBar = Math.round((totalDoneSteps / totalSteps) * 100);
+
+    if (q.kind === 'order') {
+      const builtText = selectedOrderIndices.map(i => q.tiles[i]).join('');
       host.innerHTML = `
         <div class="card-panel m1-runner">
           <div class="m1-runner-head">
             <div>
-              <span class="m1-tag">Day ${session.day} · ขั้นที่ 1/3 (3 นาที)</span>
-              <h2 style="margin:6px 0 2px">🔥 วอร์มอัพทบทวน 3 คำ</h2>
-              <p class="m1-muted" style="margin:0">กดฟังเสียงแล้วออกเสียงตามให้ครบ 3 คำ</p>
+              <span class="m1-tag">🎯 สอบวัดผล Day ${dayNum} · พาร์ท 1 ข้อ ${qIdx + 1}/${exam.questions.length} · ${core.escapeHtml(q.category)}</span>
+              <h3 style="margin:6px 0 2px">${core.escapeHtml(q.prompt)}</h3>
+              <p class="m1-muted" style="margin:0;font-size:12.5px">เกณฑ์ผ่านประจำวัน ≥ ${DAILY_MASTERY_PASS_PCT}% (19/20 คะแนน) · แตะแผ่นคำด้านล่างเพื่อเรียงเป็นประโยค</p>
+            </div>
+            <button type="button" class="btn-secondary m1-mini-btn" id="m1-exam-exit">ออก</button>
+          </div>
+          <div class="m1-prog"><div class="m1-prog-fill" style="width:${Math.max(6, pctBar)}%"></div></div>
+
+          <div class="m1-order-answer hanzi-font" id="m1-order-slot">
+            ${selectedOrderIndices.length
+              ? selectedOrderIndices.map((tileIdx, pos) => `<button type="button" class="m1-order-chip chosen" data-unpick="${pos}">${core.escapeHtml(q.tiles[tileIdx])}</button>`).join('')
+              : '<span class="m1-muted" style="font-size:14px">แตะคำด้านล่างมาวางเรียงตรงนี้...</span>'}
+          </div>
+
+          <div class="m1-order-bank">
+            ${q.tiles.map((t, idx) => {
+              const used = selectedOrderIndices.includes(idx);
+              return `<button type="button" class="m1-order-chip hanzi-font" data-pick-tile="${idx}" ${used ? 'disabled' : ''}>${core.escapeHtml(t)}</button>`;
+            }).join('')}
+          </div>
+
+          <div class="m1-runner-foot" style="justify-content:space-between;gap:8px">
+            <button type="button" class="btn-secondary" id="m1-order-clear" ${selectedOrderIndices.length ? '' : 'disabled'}>ล้างเรียงใหม่</button>
+            <button type="button" class="btn-primary" id="m1-order-submit" ${selectedOrderIndices.length === q.tiles.length ? '' : 'disabled'}>ส่งคำตอบข้อนี้ →</button>
+          </div>
+        </div>
+      `;
+
+      host.querySelector('#m1-exam-exit')?.addEventListener('click', () => { stopMic(); onExit?.(); });
+      host.querySelectorAll('[data-pick-tile]').forEach(b => {
+        b.addEventListener('click', () => {
+          const idx = Number(b.dataset.pickTile);
+          if (!selectedOrderIndices.includes(idx)) {
+            selectedOrderIndices.push(idx);
+            renderQuizStep();
+          }
+        });
+      });
+      host.querySelectorAll('[data-unpick]').forEach(b => {
+        b.addEventListener('click', () => {
+          selectedOrderIndices.splice(Number(b.dataset.unpick), 1);
+          renderQuizStep();
+        });
+      });
+      host.querySelector('#m1-order-clear')?.addEventListener('click', () => {
+        selectedOrderIndices = [];
+        renderQuizStep();
+      });
+      host.querySelector('#m1-order-submit')?.addEventListener('click', () => {
+        const isOk = builtText === q.expectedHz;
+        if (isOk) {
+          quizCorrect += 1;
+          core.playChime('ok', true);
+        } else {
+          core.playChime('err', true);
+          missedItems.push({
+            hz: q.refItem?.hz || q.expectedHz,
+            py: q.refItem?.py || '',
+            th: q.refItem?.th || '',
+            reason: `เรียงประโยคเป็น "${builtText}" (ที่ถูกคือ ${q.expectedHz})`
+          });
+        }
+        selectedOrderIndices = [];
+        qIdx += 1;
+        if (qIdx >= exam.questions.length) {
+          phase = 'speak';
+          renderSpeakStep();
+        } else {
+          renderQuizStep();
+        }
+      });
+      return;
+    }
+
+    // Choice question
+    host.innerHTML = `
+      <div class="card-panel m1-runner">
+        <div class="m1-runner-head">
+          <div>
+            <span class="m1-tag">🎯 สอบวัดผล Day ${dayNum} · พาร์ท 1 ข้อ ${qIdx + 1}/${exam.questions.length} · ${core.escapeHtml(q.category)}</span>
+            <h3 style="margin:6px 0 4px">${core.escapeHtml(q.prompt)}</h3>
+            <p class="m1-muted" style="margin:0;font-size:12.5px">เกณฑ์ผ่านประจำวัน ≥ ${DAILY_MASTERY_PASS_PCT}% (ห้ามผิดเกิน 1 คะแนนรวมทั้งชุด)</p>
+          </div>
+          <button type="button" class="btn-secondary m1-mini-btn" id="m1-exam-exit">ออก</button>
+        </div>
+        <div class="m1-prog"><div class="m1-prog-fill" style="width:${Math.max(6, pctBar)}%"></div></div>
+
+        ${q.audioHz ? `
+          <div style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
+            <button type="button" class="btn-primary" id="m1-exam-audio">🔊 กดฟังเสียงโจทย์</button>
+            <button type="button" class="btn-secondary" id="m1-exam-audio-slow">🐢 ฟังช้า 0.6x</button>
+            ${q.hidePromptHz ? '<span class="m1-muted" style="font-size:12.5px">🎧 ข้อนี้วัดทักษะการฟังล้วน</span>' : ''}
+          </div>
+        ` : ''}
+
+        <div class="m1-exam-choices">
+          ${q.options.map((opt, idx) => `
+            <button type="button" class="m1-exam-opt" data-opt="${idx}">
+              <span class="m1-opt-num">${idx + 1}</span>
+              <span>${core.escapeHtml(opt)}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    if (q.audioHz) {
+      setTimeout(() => core.speak(q.audioHz), 80);
+      host.querySelector('#m1-exam-audio')?.addEventListener('click', () => core.speak(q.audioHz));
+      host.querySelector('#m1-exam-audio-slow')?.addEventListener('click', () => speakSlow(q.audioHz));
+    }
+    host.querySelector('#m1-exam-exit')?.addEventListener('click', () => { stopMic(); onExit?.(); });
+
+    host.querySelectorAll('[data-opt]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const chosen = Number(btn.dataset.opt);
+        const isOk = chosen === q.answer;
+        if (isOk) {
+          quizCorrect += 1;
+          core.playChime('ok', true);
+        } else {
+          core.playChime('err', true);
+          missedItems.push({
+            hz: q.refItem?.hz || '',
+            py: q.refItem?.py || '',
+            th: q.refItem?.th || q.options[q.answer],
+            reason: `${q.explain} (คุณเลือก: ${q.options[chosen]})`
+          });
+        }
+        qIdx += 1;
+        if (qIdx >= exam.questions.length) {
+          phase = 'speak';
+          renderSpeakStep();
+        } else {
+          renderQuizStep();
+        }
+      });
+    });
+  };
+
+  const renderSpeakStep = () => {
+    const sp = exam.speakingPrompts[sIdx];
+    const curRes = speakResults[sIdx];
+    const tries = speakTriesUsed[sIdx];
+    const maxTries = 2;
+    const srSupported = hasSpeechRecognition();
+    const totalSteps = exam.questions.length + exam.speakingPrompts.length;
+    const pctBar = Math.round(((exam.questions.length + sIdx) / totalSteps) * 100);
+
+    host.innerHTML = `
+      <div class="card-panel m1-runner">
+        <div class="m1-runner-head">
+          <div>
+            <span class="m1-tag">🎙️ สอบพูดออกไมค์จริง Day ${dayNum} · ประโยคที่ ${sIdx + 1}/${exam.speakingPrompts.length} (ซ่อนพินอิน!)</span>
+            <h3 style="margin:6px 0 2px">พูดประโยคนี้เป็นภาษาจีนให้ชัดเจน (2 คะแนน)</h3>
+            <p class="m1-muted" style="margin:0;font-size:12.5px">พิสูจน์ว่าจำเสียงอ่านและพูดออกปากได้จริงโดยไม่พึ่งพินอิน (พูดได้สูงสุด ${maxTries} ครั้ง ระบบเก็บคะแนนรอบที่ดีที่สุด)</p>
+          </div>
+          <button type="button" class="btn-secondary m1-mini-btn" id="m1-exam-exit">ออก</button>
+        </div>
+        <div class="m1-prog"><div class="m1-prog-fill" style="width:${pctBar}%"></div></div>
+
+        <div class="m1-speak-exam-box">
+          <div class="m1-muted" style="font-size:13px;margin-bottom:4px">ความหมายที่ต้องพูด:</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:8px">"${core.escapeHtml(sp.th)}"</div>
+          <div class="hanzi-font" style="font-size:32px;font-weight:700;letter-spacing:2px;margin-bottom:14px">${core.escapeHtml(sp.hz)}</div>
+
+          ${srSupported ? `
+            <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
+              <button type="button" class="btn-primary m1-mic-exam-btn ${micListening ? 'is-listening' : ''}" id="m1-exam-mic" ${tries >= maxTries && !micListening ? 'disabled' : ''}>
+                ${micListening
+                  ? '🔴 กำลังฟังเสียงภาษาจีน... พูดเลย! (แตะเพื่อหยุด)'
+                  : `🎙️ กดพูดออกไมค์ (${tries}/${maxTries} ครั้ง)`}
+              </button>
+            </div>
+          ` : `
+            <div class="m1-fallback-dictation">
+              <div class="m1-muted" style="font-size:12.5px;margin-bottom:6px">
+                ⚠️ เบราว์เซอร์นี้ไม่รองรับไมค์ Web Speech — กรุณาพิมพ์พินอินพร้อมเลขวรรณยุกต์ทุกพยางค์แทน (เช่น <code>wo3 shi4 tai4 guo2 ren2</code>)
+              </div>
+              <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+                <input type="text" id="m1-py-fallback-in" class="vb-search" style="max-width:300px" placeholder="พิมพ์พินอิน + เลขวรรณยุกต์ 1-4...">
+                <button type="button" class="btn-primary" id="m1-py-fallback-btn" ${tries >= maxTries ? 'disabled' : ''}>ตรวจพินอิน (${tries}/${maxTries})</button>
+              </div>
+            </div>
+          `}
+
+          ${liveErrorMsg ? `<div style="color:var(--sys-red-text,#dc2626);font-size:13px;margin-top:10px">${core.escapeHtml(liveErrorMsg)}</div>` : ''}
+
+          ${curRes ? `
+            <div class="m1-speak-grade-card ${curRes.points >= 1.5 ? 'ok' : 'err'}">
+              <div style="font-weight:700">${core.escapeHtml(curRes.gradeLabel)} · ความแม่นยำ ${curRes.pronScore}%</div>
+              ${liveHeardText ? `<div class="m1-muted" style="font-size:12.5px;margin-top:2px">เสียงที่ระบบได้ยิน: <b class="hanzi-font">${core.escapeHtml(liveHeardText)}</b></div>` : ''}
+              ${renderSyllableBadges(curRes.syllables)}
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="m1-runner-foot" style="justify-content:flex-end">
+          <button type="button" class="btn-primary" id="m1-speak-next" ${curRes ? '' : 'disabled'}>
+            ${sIdx + 1 < exam.speakingPrompts.length ? 'ประโยคถัดไป →' : '📊 ส่งกระดาษคำตอบ & ดูผลสอบ 95% →'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    host.querySelector('#m1-exam-exit')?.addEventListener('click', () => { stopMic(); onExit?.(); });
+
+    host.querySelector('#m1-exam-mic')?.addEventListener('click', () => {
+      if (micListening) {
+        stopMic();
+        micListening = false;
+        renderSpeakStep();
+        return;
+      }
+      if (speakTriesUsed[sIdx] >= maxTries) return;
+      liveErrorMsg = '';
+      micListening = true;
+      renderSpeakStep();
+
+      activeMic = startSpeechRecognition({
+        lang: 'zh-CN',
+        onResult(transcript) {
+          micListening = false;
+          liveHeardText = transcript;
+          speakTriesUsed[sIdx] += 1;
+          const graded = gradeSpeakingExamItem({
+            targetHz: sp.hz,
+            targetPy: sp.py,
+            heardText: transcript,
+            charPinyinMap: charPyMap
+          });
+          const prev = speakResults[sIdx];
+          if (!prev || graded.points >= prev.points) {
+            speakResults[sIdx] = graded;
+          }
+          core.playChime(graded.points >= 1.5 ? 'ok' : 'err', true);
+          renderSpeakStep();
+        },
+        onError(msg) {
+          micListening = false;
+          liveErrorMsg = msg;
+          renderSpeakStep();
+        },
+        onEnd() {
+          if (micListening) {
+            micListening = false;
+            renderSpeakStep();
+          }
+        }
+      });
+    });
+
+    host.querySelector('#m1-py-fallback-btn')?.addEventListener('click', () => {
+      const inp = host.querySelector('#m1-py-fallback-in');
+      const val = inp ? inp.value.trim() : '';
+      if (!val || speakTriesUsed[sIdx] >= maxTries) return;
+      speakTriesUsed[sIdx] += 1;
+      const graded = gradeSpeakingExamItem({
+        targetHz: sp.hz,
+        targetPy: sp.py,
+        typedPinyinFallback: val
+      });
+      const prev = speakResults[sIdx];
+      if (!prev || graded.points >= prev.points) {
+        speakResults[sIdx] = graded;
+      }
+      core.playChime(graded.points >= 1.5 ? 'ok' : 'err', true);
+      renderSpeakStep();
+    });
+
+    host.querySelector('#m1-speak-next')?.addEventListener('click', () => {
+      stopMic();
+      liveHeardText = '';
+      liveErrorMsg = '';
+      sIdx += 1;
+      if (sIdx >= exam.speakingPrompts.length) {
+        finishAndSaveResult();
+      } else {
+        renderSpeakStep();
+      }
+    });
+  };
+
+  renderQuizStep();
+}
+
+/**
+ * Standalone Exam launcher (used by 14-Day Intensive Plan `#daily-quiz-card` as well).
+ */
+export function renderExamOnlyRunner(core, host, dayNum, onDone) {
+  mountExamStage(core, host, {
+    dayNum,
+    standalone: true,
+    onPassContinue: (nextDay) => {
+      if (onDone) onDone({ passed: true, nextDay });
+    },
+    onRestudy: () => {
+      renderGuidedRunner(core, host, () => onDone?.({ passed: false }), { targetDay: dayNum });
+    },
+    onExit: () => onDone?.({ exited: true })
+  });
+}
+
+/**
+ * Full 4-Step Guided Daily Study + Mandatory >=95% Daily Mastery Exam.
+ * Cannot skip study steps, and Day is NOT completed until exam score >= 95%.
+ */
+export function renderGuidedRunner(core, host, onDone, opts = {}) {
+  const day = Number(opts.targetDay) || getTodayBlueprintDay(core.state.progress, core.getExt('month1'));
+  const session = buildGuidedSession(day, core.state.progress.mistakes || []);
+  let step = 0; // 0: closed-book warmup recall, 1: tone pairs, 2: speak 5 + mic practice, 3: 95% mastery exam
+  const checkedWarmup = new Set();
+  const listenedTones = new Set();
+  const checkedTones = new Set();
+  const checkedSpeak = new Set();
+  const speakPracticeFeedback = {};
+  let activePracticeMic = null;
+  let charPyMap = null;
+  getCharPinyinMap(core).then(m => { charPyMap = m; }).catch(() => {});
+
+  // Build 4-option choices for Step 1 Active Recall Warm-up
+  const warmupChoices = session.warmup.map((w) => {
+    const others = SURVIVAL_50.filter(s => s.th !== w.th).slice(0, 12);
+    const distractors = core.shuffleArray(others).slice(0, 3).map(d => d.th);
+    return core.shuffleArray([w.th, ...distractors]);
+  });
+  const warmupFeedback = {};
+
+  const stopMic = () => {
+    if (activePracticeMic) {
+      try { activePracticeMic.stop(); } catch { /* ignore */ }
+      activePracticeMic = null;
+    }
+  };
+
+  const speakSlow = (hz) => {
+    const prev = core.state.rate;
+    core.state.rate = 0.6;
+    core.speak(hz, () => { core.state.rate = prev; });
+  };
+
+  const draw = () => {
+    if (step === 0) {
+      const allDone = checkedWarmup.size >= session.warmup.length;
+      host.innerHTML = `
+        <div class="card-panel m1-runner">
+          <div class="m1-runner-head">
+            <div>
+              <span class="m1-tag">Day ${session.day} · ขั้นที่ 1/4 (ทวนความจำแบบปิดโพย)</span>
+              <h2 style="margin:6px 0 2px">🔄 ทดสอบทวนคำเดิมก่อนเริ่มบทใหม่ (${checkedWarmup.size}/${session.warmup.length})</h2>
+              <p class="m1-muted" style="margin:0">กดฟังเสียงแล้วเลือกความหมายให้ถูกต้องครบทุกข้อ (ซ่อนพินอินเพื่อเช็กว่าจำได้จริง)</p>
             </div>
             <button type="button" class="btn-secondary" id="m1-run-exit">ออก</button>
           </div>
-          <div class="m1-prog"><div class="m1-prog-fill" style="width:${Math.max(10, pct)}%"></div></div>
+          <div class="m1-prog"><div class="m1-prog-fill" style="width:15%"></div></div>
           <div class="m1-list">
-            ${session.warmup.map((w, i) => `
-              <div class="m1-item ${checkedWarmup.has(i) ? 'done' : ''}">
-                <div>
-                  <div class="m1-hz hanzi-font">${core.escapeHtml(w.hz)} <span class="m1-py">${core.escapeHtml(w.py)}</span></div>
-                  <div class="m1-muted">${core.escapeHtml(w.th)}</div>
+            ${session.warmup.map((w, i) => {
+              const isOk = checkedWarmup.has(i);
+              const fb = warmupFeedback[i] || '';
+              return `
+                <div class="m1-item ${isOk ? 'done' : ''}" style="flex-direction:column;align-items:stretch">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+                    <div class="m1-hz hanzi-font">
+                      ${core.escapeHtml(w.hz)}
+                      ${isOk ? `<span class="m1-py">${core.escapeHtml(w.py)} · ${core.escapeHtml(w.th)}</span>` : '<span class="m1-muted" style="font-size:12px;font-weight:500">(ซ่อนพินอิน)</span>'}
+                    </div>
+                    <button type="button" class="btn-secondary m1-mini-btn" data-play="${i}">🔊 ฟังเสียง</button>
+                  </div>
+                  ${isOk ? `<div style="color:var(--sys-green-text,#16a34a);font-size:13px;font-weight:700">✓ ตอบถูกต้อง จำแม่นแล้ว!</div>` : `
+                    <div class="m1-chip-row" style="margin-top:6px">
+                      ${warmupChoices[i].map(opt => `
+                        <button type="button" class="btn-secondary m1-mini-btn" data-w-ans="${i}" data-w-val="${core.escapeHtml(opt)}">${core.escapeHtml(opt)}</button>
+                      `).join('')}
+                    </div>
+                    ${fb ? `<div style="color:var(--sys-red-text,#dc2626);font-size:12.5px;margin-top:4px">${core.escapeHtml(fb)}</div>` : ''}
+                  `}
                 </div>
-                <div class="m1-row-btns">
-                  <button type="button" class="btn-secondary" data-play="${i}">🔊 ฟัง</button>
-                  <button type="button" class="btn-primary" data-ok="${i}" ${checkedWarmup.has(i) ? 'disabled style="opacity:0.65;cursor:default"' : ''}>${checkedWarmup.has(i) ? '✓ แล้ว' : 'จำได้แล้ว'}</button>
-                </div>
-              </div>`).join('')}
+              `;
+            }).join('')}
           </div>
           <div class="m1-runner-foot">
-            <button type="button" class="btn-primary" id="m1-next-step">ไปขั้นที่ 2: ฝึกคู่วรรณยุกต์ →</button>
+            <button type="button" class="btn-primary" id="m1-next-step" ${allDone ? '' : 'disabled'}>
+              ${allDone ? 'ไปขั้นที่ 2: ฝึกคู่วรรณยุกต์ →' : `ตอบทวนให้ครบทั้ง ${session.warmup.length} ข้อก่อนไปต่อ`}
+            </button>
           </div>
         </div>`;
+
       host.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => core.speak(session.warmup[Number(b.dataset.play)].hz)));
-      host.querySelectorAll('[data-ok]').forEach(b => b.addEventListener('click', () => {
-        const idx = Number(b.dataset.ok);
-        if (checkedWarmup.has(idx)) return;
-        checkedWarmup.add(idx);
-        core.playChime('ok', true);
+      host.querySelectorAll('[data-w-ans]').forEach(b => b.addEventListener('click', () => {
+        const idx = Number(b.dataset.wAns);
+        const val = b.dataset.wVal;
+        const target = session.warmup[idx];
+        if (val === target.th) {
+          checkedWarmup.add(idx);
+          delete warmupFeedback[idx];
+          core.playChime('ok', true);
+        } else {
+          warmupFeedback[idx] = `ยังไม่ถูก! กดฟังเสียง "${target.hz}" อีกครั้งแล้วเลือกความหมายใหม่นะ`;
+          core.playChime('err', true);
+        }
         draw();
       }));
     } else if (step === 1) {
+      const allDone = checkedTones.size >= session.toneFocus.length;
       host.innerHTML = `
         <div class="card-panel m1-runner">
           <div class="m1-runner-head">
             <div>
-              <span class="m1-tag">Day ${session.day} · ขั้นที่ 2/3 (6 นาที)</span>
-              <h2 style="margin:6px 0 2px">🎵 ฝึก 4 คู่วรรณยุกต์ประจำวัน</h2>
-              <p class="m1-muted" style="margin:0">${core.escapeHtml(session.meta.title)} — ${core.escapeHtml(session.meta.focus)}</p>
+              <span class="m1-tag">Day ${session.day} · ขั้นที่ 2/4 (ฝึกหูและวรรณยุกต์)</span>
+              <h2 style="margin:6px 0 2px">🎵 ฝึก 4 คู่วรรณยุกต์ประจำวัน (${checkedTones.size}/${session.toneFocus.length})</h2>
+              <p class="m1-muted" style="margin:0">${core.escapeHtml(session.meta.title)} — กดฟังเสียงแล้วออกเสียงตามให้ครบทุกคู่เพื่อเตรียมสอบฟังท้ายบท</p>
             </div>
             <button type="button" class="btn-secondary" id="m1-run-exit">ออก</button>
           </div>
-          <div class="m1-prog"><div class="m1-prog-fill" style="width:45%"></div></div>
+          <div class="m1-prog"><div class="m1-prog-fill" style="width:40%"></div></div>
           <div class="m1-list">
-            ${session.toneFocus.map((t, i) => `
-              <div class="m1-item ${checkedTones.has(i) ? 'done' : ''}">
-                <div>
-                  <span class="m1-tag">${core.escapeHtml(t.label)}</span>
-                  <div class="m1-hz hanzi-font" style="margin-top:4px">${core.escapeHtml(t.hz)} <span class="m1-py">${core.escapeHtml(t.py)}</span></div>
-                  <div class="m1-muted">${core.escapeHtml(t.th)} · 💡 ${core.escapeHtml(t.tip)}</div>
-                </div>
-                <div class="m1-row-btns">
-                  <button type="button" class="btn-secondary" data-play="${i}">🔊 ฟัง</button>
-                  <button type="button" class="btn-primary" data-ok="${i}" ${checkedTones.has(i) ? 'disabled style="opacity:0.65;cursor:default"' : ''}>${checkedTones.has(i) ? '✓ ผ่าน' : 'พูดตามแล้ว'}</button>
-                </div>
-              </div>`).join('')}
+            ${session.toneFocus.map((t, i) => {
+              const hasListened = listenedTones.has(i);
+              const isDone = checkedTones.has(i);
+              return `
+                <div class="m1-item ${isDone ? 'done' : ''}">
+                  <div>
+                    <span class="m1-tag">${core.escapeHtml(t.label)}</span>
+                    <div class="m1-hz hanzi-font" style="margin-top:4px">${core.escapeHtml(t.hz)} <span class="m1-py">${core.escapeHtml(t.py)}</span></div>
+                    <div class="m1-muted">${core.escapeHtml(t.th)} · 💡 ${core.escapeHtml(t.tip)}</div>
+                  </div>
+                  <div class="m1-row-btns">
+                    <button type="button" class="btn-secondary m1-mini-btn" data-slow="${i}">🐢 0.6x</button>
+                    <button type="button" class="btn-secondary m1-mini-btn" data-play="${i}">🔊 ฟัง</button>
+                    <button type="button" class="btn-primary m1-mini-btn" data-ok="${i}" ${(!hasListened || isDone) ? 'disabled' : ''}>
+                      ${isDone ? '✓ ฝึกแล้ว' : (hasListened ? 'ออกเสียงตามแล้ว' : 'กดฟังก่อน')}
+                    </button>
+                  </div>
+                </div>`;
+            }).join('')}
           </div>
-          <div class="m1-runner-foot">
-            <button type="button" class="btn-primary" id="m1-next-step">ไปขั้นที่ 3: ฝึกพูด 5 ประโยค →</button>
+          <div class="m1-runner-foot" style="justify-content:space-between">
+            <button type="button" class="btn-secondary" id="m1-prev-step">← ย้อนกลับ</button>
+            <button type="button" class="btn-primary" id="m1-next-step" ${allDone ? '' : 'disabled'}>
+              ${allDone ? 'ไปขั้นที่ 3: ฝึกพูด 5 ประโยค →' : `กดฟังและฝึกให้ครบ ${session.toneFocus.length} คู่ก่อน`}
+            </button>
           </div>
         </div>`;
-      host.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => core.speak(session.toneFocus[Number(b.dataset.play)].hz)));
+
+      host.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => {
+        const idx = Number(b.dataset.play);
+        listenedTones.add(idx);
+        core.speak(session.toneFocus[idx].hz);
+        draw();
+      }));
+      host.querySelectorAll('[data-slow]').forEach(b => b.addEventListener('click', () => {
+        const idx = Number(b.dataset.slow);
+        listenedTones.add(idx);
+        speakSlow(session.toneFocus[idx].hz);
+        draw();
+      }));
       host.querySelectorAll('[data-ok]').forEach(b => b.addEventListener('click', () => {
         const idx = Number(b.dataset.ok);
-        if (checkedTones.has(idx)) return;
+        if (!listenedTones.has(idx) || checkedTones.has(idx)) return;
         checkedTones.add(idx);
         core.playChime('ok', true);
         draw();
       }));
+      host.querySelector('#m1-prev-step')?.addEventListener('click', () => { step = 0; draw(); });
     } else if (step === 2) {
+      const allDone = checkedSpeak.size >= session.speakItems.length;
+      const srAvail = hasSpeechRecognition();
       host.innerHTML = `
         <div class="card-panel m1-runner">
           <div class="m1-runner-head">
             <div>
-              <span class="m1-tag">Day ${session.day} · ขั้นที่ 3/3 (6 นาที)</span>
-              <h2 style="margin:6px 0 2px">🗣️ พูดตาม 5 ประโยคเอาตัวรอด</h2>
-              <p class="m1-muted" style="margin:0">กดฟังช้าๆ แล้วออกเสียงตามให้คล่องปาก</p>
+              <span class="m1-tag">Day ${session.day} · ขั้นที่ 3/4 (ซ้อมพูดก่อนเข้าห้องสอบ)</span>
+              <h2 style="margin:6px 0 2px">🗣️ ซ้อมพูด 5 ประโยคประจำวัน (${checkedSpeak.size}/${session.speakItems.length})</h2>
+              <p class="m1-muted" style="margin:0">จำตัวจีนและเสียงอ่านให้แม่น! ในขั้นถัดไปจะต้อง <b>สอบพูดออกไมค์โดยซ่อนพินอิน</b> และทำคะแนนรวมให้ได้ ≥ ${DAILY_MASTERY_PASS_PCT}%</p>
             </div>
             <button type="button" class="btn-secondary" id="m1-run-exit">ออก</button>
           </div>
-          <div class="m1-prog"><div class="m1-prog-fill" style="width:80%"></div></div>
+          <div class="m1-prog"><div class="m1-prog-fill" style="width:68%"></div></div>
           <div class="m1-list">
-            ${session.speakItems.map((s, i) => `
-              <div class="m1-item ${checkedSpeak.has(i) ? 'done' : ''}">
-                <div>
-                  <div class="m1-hz hanzi-font">${core.escapeHtml(s.hz)}</div>
-                  <div class="m1-py">${core.escapeHtml(s.py)}</div>
-                  <div class="m1-muted">${core.escapeHtml(s.th)}</div>
-                </div>
-                <div class="m1-row-btns">
-                  <button type="button" class="btn-secondary" data-slow="${i}">🐢 0.6x</button>
-                  <button type="button" class="btn-secondary" data-play="${i}">🔊 ปกติ</button>
-                  <button type="button" class="btn-primary" data-ok="${i}" ${checkedSpeak.has(i) ? 'disabled style="opacity:0.65;cursor:default"' : ''}>${checkedSpeak.has(i) ? '✓ คล่อง' : 'พูดแล้ว'}</button>
-                </div>
-              </div>`).join('')}
+            ${session.speakItems.map((s, i) => {
+              const isDone = checkedSpeak.has(i);
+              const pracFb = speakPracticeFeedback[i];
+              return `
+                <div class="m1-item ${isDone ? 'done' : ''}" style="flex-direction:column;align-items:stretch">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+                    <div>
+                      <div class="m1-hz hanzi-font">${core.escapeHtml(s.hz)}</div>
+                      <div class="m1-py">${core.escapeHtml(s.py)}</div>
+                      <div class="m1-muted">${core.escapeHtml(s.th)} · 💡 ${core.escapeHtml(s.tip)}</div>
+                    </div>
+                    <div class="m1-row-btns">
+                      <button type="button" class="btn-secondary m1-mini-btn" data-slow="${i}">🐢 0.6x</button>
+                      <button type="button" class="btn-secondary m1-mini-btn" data-play="${i}">🔊 ปกติ</button>
+                      ${srAvail ? `<button type="button" class="btn-secondary m1-mini-btn" data-prac-mic="${i}">🎙️ ซ้อมไมค์</button>` : ''}
+                      <button type="button" class="btn-primary m1-mini-btn" data-ok="${i}" ${isDone ? 'disabled' : ''}>${isDone ? '✓ พร้อมสอบ' : 'จำได้แล้ว'}</button>
+                    </div>
+                  </div>
+                  ${pracFb ? `<div style="margin-top:6px;font-size:12.5px">${pracFb}</div>` : ''}
+                </div>`;
+            }).join('')}
           </div>
-          <div class="m1-runner-foot">
-            <button type="button" class="btn-primary" id="m1-next-step">🎉 จบบทเรียนวันนี้ (+40 XP)</button>
+          <div class="m1-runner-foot" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn-secondary" id="m1-prev-step">← ย้อนกลับ</button>
+            <button type="button" class="btn-primary" id="m1-next-step" ${allDone ? '' : 'disabled'}>
+              ${allDone ? `📝 เข้าห้องสอบประจำวัน Day ${session.day} (เกณฑ์ผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}%) →` : `ซ้อมให้ครบทั้ง ${session.speakItems.length} ประโยคก่อนเข้าสอบ`}
+            </button>
           </div>
         </div>`;
+
       host.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => core.speak(session.speakItems[Number(b.dataset.play)].hz)));
-      host.querySelectorAll('[data-slow]').forEach(b => b.addEventListener('click', () => {
-        const prev = core.state.rate;
-        core.state.rate = 0.6;
-        core.speak(session.speakItems[Number(b.dataset.slow)].hz, () => { core.state.rate = prev; });
+      host.querySelectorAll('[data-slow]').forEach(b => b.addEventListener('click', () => speakSlow(session.speakItems[Number(b.dataset.slow)].hz)));
+      host.querySelectorAll('[data-prac-mic]').forEach(b => b.addEventListener('click', () => {
+        stopMic();
+        const idx = Number(b.dataset.pracMic);
+        const s = session.speakItems[idx];
+        const cleanHz = s.hz.replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim();
+        speakPracticeFeedback[idx] = '<span style="color:var(--sys-accent,#007aff);font-weight:600">🔴 กำลังฟังเสียงซ้อม... พูดเลย!</span>';
+        draw();
+        activePracticeMic = startSpeechRecognition({
+          lang: 'zh-CN',
+          onResult(heard) {
+            const res = scorePronunciation(cleanHz, s.py, heard, charPyMap);
+            if (res.score >= 75) checkedSpeak.add(idx);
+            speakPracticeFeedback[idx] = `<b>ซ้อมออกเสียง: ${res.score}%</b> (ได้ยิน: <span class="hanzi-font">${core.escapeHtml(heard)}</span>) ${renderSyllableBadges(res.syllables)}`;
+            core.playChime(res.score >= 75 ? 'ok' : 'err', true);
+            draw();
+          },
+          onError(err) {
+            speakPracticeFeedback[idx] = `<span style="color:var(--sys-red-text,#dc2626)">${core.escapeHtml(err)}</span>`;
+            draw();
+          }
+        });
       }));
       host.querySelectorAll('[data-ok]').forEach(b => b.addEventListener('click', () => {
         const idx = Number(b.dataset.ok);
-        if (checkedSpeak.has(idx)) return;
         checkedSpeak.add(idx);
         core.playChime('ok', true);
         draw();
       }));
+      host.querySelector('#m1-prev-step')?.addEventListener('click', () => { stopMic(); step = 1; draw(); });
     } else {
-      // Completed!
-      const extBefore = core.getExt('month1') || {};
-      const todayKey = core.todayKey();
-      const alreadyDoneToday = extBefore.lastGuidedDate === todayKey;
-
-      core.setExt('month1', (cur) => {
-        const done = new Set(Array.isArray(cur.doneDays) ? cur.doneDays : []);
-        if (session.day >= 15) done.add(session.day);
-        cur.doneDays = [...done];
-        cur.lastGuidedDate = todayKey;
-        return cur;
-      }, { save: false });
-
-      if (!alreadyDoneToday) {
-        core.addXp(40, `เรียนรอบประจำวัน Day ${session.day} ครบแล้ว!`);
-      } else {
-        core.addXp(5, `ทบทวนรอบประจำวัน Day ${session.day} ซ้ำ`);
-      }
-      core.spawnConfetti(28);
-      core.pandaSay('太棒了! เก่งมาก เรียนครบวันนี้แล้ว!');
-      host.innerHTML = `
-        <div class="card-panel m1-runner" style="text-align:center;padding:32px 20px">
-          <div style="font-size:48px">🎉</div>
-          <h2 style="margin:8px 0">เยี่ยมมาก! จบชุดเรียน Day ${session.day} แล้ว</h2>
-          <p class="m1-muted">${alreadyDoneToday ? 'ทบทวนซ้ำ (+5 XP) · เก่งมากที่ฝึกฝนอย่างสม่ำเสมอ' : 'ได้รับ +40 XP · บันทึกความคืบหน้าและรักษา Streak เรียบร้อย'}</p>
-          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px">
-            <button type="button" class="btn-primary" id="m1-done-back">กลับหน้าเดือนแรก</button>
-            <button type="button" class="btn-secondary" id="m1-go-roleplay">🎙️ ไปลองคุย AI Roleplay</button>
-          </div>
-        </div>`;
-      host.querySelector('#m1-done-back')?.addEventListener('click', onDone);
-      host.querySelector('#m1-go-roleplay')?.addEventListener('click', () => core.switchTab('speak-studio'));
+      // Step 3 -> Enter Strict >=95% Daily Mastery Exam!
+      stopMic();
+      mountExamStage(core, host, {
+        dayNum: session.day,
+        standalone: false,
+        onPassContinue: (nextDay) => {
+          renderGuidedRunner(core, host, onDone, { targetDay: nextDay });
+        },
+        onRestudy: () => {
+          // Send learner back to study phase with refreshed mistakes in Step 1!
+          renderGuidedRunner(core, host, onDone, { targetDay: session.day });
+        },
+        onExit: onDone
+      });
       return;
     }
 
-    host.querySelector('#m1-run-exit')?.addEventListener('click', onDone);
-    host.querySelector('#m1-next-step')?.addEventListener('click', () => { step++; draw(); });
+    host.querySelector('#m1-run-exit')?.addEventListener('click', () => { stopMic(); onDone?.(); });
+    host.querySelector('#m1-next-step')?.addEventListener('click', () => { stopMic(); step++; draw(); });
   };
 
   draw();

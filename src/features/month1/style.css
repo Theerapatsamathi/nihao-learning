@@ -210,3 +210,184 @@
   .main-content, .content-wrap, .m1-cb-sheet { padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: none !important; }
   .m1-cb-char-row { break-inside: avoid; }
 }
+
+
+/* ==========================================================================
+   95% Daily Mastery Gate (Exam Choices, Sentence Order, Mic Grading & Report)
+   ========================================================================== */
+.m1-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.m1-status-pill.pass {
+  background: rgba(52, 199, 89, 0.16);
+  color: var(--sys-green-text, #15803d);
+}
+.m1-status-pill.fail {
+  background: rgba(255, 59, 48, 0.14);
+  color: var(--sys-red-text, #dc2626);
+}
+.m1-status-pill.pending {
+  background: rgba(255, 149, 0, 0.14);
+  color: var(--sys-orange-text, #c2410c);
+}
+
+.m1-exam-choices {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+.m1-exam-opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--sys-sep, rgba(120, 120, 128, 0.22));
+  background: var(--sys-bg-elevated, #fff);
+  color: var(--sys-label, #111);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.m1-exam-opt:hover {
+  border-color: var(--sys-accent, #007aff);
+  background: rgba(0, 122, 255, 0.06);
+  transform: translateY(-1px);
+}
+.m1-opt-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  background: var(--sys-fill-3, rgba(120, 120, 128, 0.16));
+  flex-shrink: 0;
+}
+
+.m1-order-answer {
+  min-height: 58px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px dashed var(--sys-sep, rgba(120, 120, 128, 0.3));
+  background: var(--sys-fill-3, rgba(120, 120, 128, 0.06));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.m1-order-bank {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.m1-order-chip {
+  padding: 8px 15px;
+  border-radius: 10px;
+  border: 1px solid var(--sys-sep, rgba(120, 120, 128, 0.25));
+  background: var(--sys-bg-elevated, #fff);
+  color: var(--sys-label, #111);
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.14s ease;
+}
+.m1-order-chip.chosen {
+  background: var(--sys-accent, #007aff);
+  color: #fff;
+  border-color: transparent;
+}
+.m1-order-chip:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.m1-speak-exam-box {
+  text-align: center;
+  padding: 20px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--sys-sep, rgba(120, 120, 128, 0.2));
+  background: var(--sys-fill-3, rgba(120, 120, 128, 0.06));
+}
+.m1-mic-exam-btn.is-listening {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+  animation: m1PulseMic 1s ease-in-out infinite alternate;
+}
+@keyframes m1PulseMic {
+  from { transform: scale(1); }
+  to { transform: scale(1.04); }
+}
+.m1-speak-grade-card {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 120, 128, 0.25);
+}
+.m1-speak-grade-card.ok {
+  border-color: rgba(52, 199, 89, 0.5);
+  background: rgba(52, 199, 89, 0.08);
+}
+.m1-speak-grade-card.err {
+  border-color: rgba(255, 59, 48, 0.45);
+  background: rgba(255, 59, 48, 0.08);
+}
+.m1-syl-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.m1-syl-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.m1-syl-chip small { font-size: 10.5px; opacity: 0.85; }
+.m1-syl-chip.is-green { background: rgba(52, 199, 89, 0.18); color: var(--sys-green-text, #15803d); }
+.m1-syl-chip.is-yellow { background: rgba(255, 149, 0, 0.2); color: var(--sys-orange-text, #b45309); }
+.m1-syl-chip.is-red { background: rgba(255, 59, 48, 0.18); color: var(--sys-red-text, #dc2626); }
+
+.m1-score-breakdown {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  max-width: 520px;
+  margin: 16px auto 0;
+}
+.m1-score-box {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--sys-fill-3, rgba(120, 120, 128, 0.12));
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.m1-score-box span { font-size: 12px; color: var(--sys-label-2, #666); }
+.m1-score-box strong { font-size: 17px; }
+.m1-missed-panel {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sys-sep, rgba(120, 120, 128, 0.2));
+}
+.theme-dark .m1-exam-opt,
+.theme-dark .m1-order-chip:not(.chosen) {
+  background: var(--sys-bg-elevated, #1c1c1e);
+  color: var(--sys-label, #f5f5f7);
+}

@@ -1,6 +1,6 @@
 // UI Views for Month-1 Starter Pack (Home/30-Day Blueprint, 20 Tone Pairs + Traps, 64 Mnemonics, 50 Survival Sentences)
 import { TONE_PAIRS, THAI_TRAPS, MONTH1_DAYS_15_30, HANZI_MNEMONICS, SURVIVAL_50 } from './data-month1.js';
-import { calcMonth1Stats, getTodayBlueprintDay } from './logic.js';
+import { DAILY_MASTERY_PASS_PCT, calcMonth1Stats, getTodayBlueprintDay, getDayMasteryRecord, isDayMastered } from './logic.js';
 import { openQuickDict, showStrokePreview } from './quick-dict.js';
 import { renderGuidedRunner, toggleBeginnerMode } from './guided-session.js';
 
@@ -40,17 +40,55 @@ export function renderMonth1Tab(core, host) {
 
 function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
   const beginnerOn = Boolean(ext.beginnerMode);
-  const doneToday = ext.lastGuidedDate === core.todayKey();
-  const done15_30 = new Set(Array.isArray(ext.doneDays) ? ext.doneDays : []);
+  const curRec = getDayMasteryRecord(todayDay, ext);
+  const plan14 = Array.isArray(window.DAILY_PLAN_DATA) ? window.DAILY_PLAN_DATA : [];
+
+  const renderDayCard = (dObj, isFirstHalf) => {
+    const dayNum = dObj.day;
+    const mastered = isDayMastered(dayNum, core.state.progress, ext);
+    const rec = getDayMasteryRecord(dayNum, ext);
+    const isCur = dayNum === todayDay;
+    let badgeHtml = `<span class="m1-status-pill pending">🔒 รอสอบ ≥${DAILY_MASTERY_PASS_PCT}%</span>`;
+    if (mastered) {
+      badgeHtml = `<span class="m1-status-pill pass">✅ ผ่าน ${rec.bestPct || 100}%</span>`;
+    } else if (rec.attempts > 0) {
+      badgeHtml = `<span class="m1-status-pill fail">⚠️ ล่าสุด ${rec.lastPct}% (ยังไม่ถึง ${DAILY_MASTERY_PASS_PCT}%)</span>`;
+    }
+
+    const words = isFirstHalf
+      ? (Array.isArray(dObj.quickReview) ? dObj.quickReview.slice(0, 4).map(x => x.hanzi) : [])
+      : (Array.isArray(dObj.words) ? dObj.words : []);
+
+    return `
+      <div class="m1-day-card ${mastered ? 'done' : ''} ${isCur ? 'current' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="m1-tag">Day ${dayNum} · W${dObj.week}</span>
+          ${badgeHtml}
+        </div>
+        <div style="font-weight:700;margin:6px 0 3px">${core.escapeHtml(dObj.title)}</div>
+        <div class="m1-muted" style="font-size:12px;margin-bottom:8px">${core.escapeHtml(isFirstHalf ? dObj.goal : dObj.focus)}</div>
+        <div class="m1-chip-row">
+          ${words.map(w => `<button type="button" class="m1-chip hanzi-font" data-say="${core.escapeHtml(w)}">🔊 ${core.escapeHtml(w)}</button>`).join('')}
+        </div>
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn-primary m1-mini-btn" data-launch-day="${dayNum}">
+            ${mastered ? `🔄 ทวน & สอบซ้ำ` : (rec.attempts > 0 ? `📖 เรียนซ่อม & สอบใหม่` : `▶ เรียน & สอบ Day ${dayNum}`)}
+          </button>
+          ${!isFirstHalf ? `<button type="button" class="btn-secondary m1-mini-btn" data-go-tab="${dObj.tab}">สื่อเสริม →</button>` : `<button type="button" class="btn-secondary m1-mini-btn" data-open-plan14="${dayNum}">เนื้อหาละเอียด</button>`}
+        </div>
+      </div>`;
+  };
 
   body.innerHTML = `
     <div class="card-panel m1-hero">
       <div class="m1-hero-left">
-        <div class="m1-tag">🌱 เส้นทางเดือนแรก (0 → HSK 1) · ความคืบหน้า ${stats.pct}%</div>
-        <h2 style="margin:8px 0 6px">วันนี้เรียน Day ${todayDay} / 30 ${doneToday ? '✅ เรียนครบแล้ว!' : ''}</h2>
-        <p class="m1-muted" style="margin:0 0 14px">กดปุ่มเดียวพาไล่ครบ: วอร์มอัพคำเดิม → คู่วรรณยุกต์ → พูดตาม 5 ประโยคเอาตัวรอด (15 นาทีจบ)</p>
+        <div class="m1-tag">🌱 เส้นทางเดือนแรก (0 → HSK 1) · มาตรฐานสอบผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}% ทุกวัน</div>
+        <h2 style="margin:8px 0 6px">เป้าหมายปัจจุบัน: Day ${todayDay} / 30 ${curRec.passed ? '✅ สอบผ่านครบแล้ว!' : (curRec.attempts > 0 ? `(ล่าสุด ${curRec.lastPct}% · ต้องซ่อมให้ถึง ${DAILY_MASTERY_PASS_PCT}%)` : '')}</h2>
+        <p class="m1-muted" style="margin:0 0 14px">เลิกกดติ๊กผ่านหลอกตัวเอง! ทุกวันต้องผ่าน <b>ทวนคำเดิม → ฝึกวรรณยุกต์ → ซ้อมพูด → สอบฟัง+เรียงคำ+พูดออกไมค์จริง ≥ ${DAILY_MASTERY_PASS_PCT}%</b> ถึงจะปลดล็อกวันถัดไป</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button type="button" class="btn-primary" id="m1-start-guided">▶ เริ่มเรียนวันนี้ (15 นาที)</button>
+          <button type="button" class="btn-primary" id="m1-start-guided">
+            ${curRec.attempts > 0 && !curRec.passed ? `📖 เรียนทบทวน & สอบแก้ตัว Day ${todayDay}` : `▶ เริ่มเรียน & สอบ Day ${todayDay} (≥${DAILY_MASTERY_PASS_PCT}%)`}
+          </button>
           <label class="m1-toggle-chip">
             <input type="checkbox" id="m1-beginner-chk" ${beginnerOn ? 'checked' : ''}>
             <span>โหมดเดือนแรก (ซ่อนเมนูขั้นสูง)</span>
@@ -58,66 +96,54 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
         </div>
       </div>
       <div class="m1-kpi-mini">
-        <div><strong>${stats.totalDaysDone}/30</strong><span>วัน</span></div>
+        <div><strong>${stats.totalDaysDone}/30</strong><span>วันผ่าน ≥95%</span></div>
         <div><strong>${stats.tonePairsDone}/20</strong><span>คู่เสียง</span></div>
         <div><strong>${stats.mnemonicsDone}/64</strong><span>อักษรจำได้</span></div>
       </div>
     </div>
 
+    ${plan14.length > 0 ? `
+      <div class="card-panel" style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+          <h3 style="margin:0">📅 สัปดาห์ 1–2 (Day 1–14): พินอิน วรรณยุกต์ & รากฐานการออกเสียง</h3>
+          <button type="button" class="btn-secondary" id="m1-go-plan14">เปิดตารางเรียนละเอียด 60 นาที →</button>
+        </div>
+        <div class="m1-days-grid">
+          ${plan14.map(d => renderDayCard(d, true)).join('')}
+        </div>
+      </div>
+    ` : ''}
+
     <div class="card-panel" style="margin-top:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-        <h3 style="margin:0">📅 แผน 30 วันครบเดือนแรก</h3>
-        <button type="button" class="btn-secondary" id="m1-go-plan14">เปิดแผน Day 1–14 (พินอิน) →</button>
-      </div>
-      <div class="m1-muted" style="font-size:13px;margin-bottom:12px">
-        <b>สัปดาห์ 1–2 (Day 1–14):</b> พินอิน วรรณยุกต์ และ 32 อักษรพื้นฐาน (เชื่อมกับแท็บ "แผนเรียน 14 วัน")<br>
-        <b>สัปดาห์ 3–4 (Day 15–30):</b> คำศัพท์เอาตัวรอด 20 คู่เสียง สนทนาจริง และสอบจบเดือนแรก
+        <h3 style="margin:0">📅 สัปดาห์ 3–4 (Day 15–30): สนทนาเอาตัวรอด แต่งประโยค & สอบจบ HSK 1</h3>
       </div>
       <div class="m1-days-grid">
-        ${MONTH1_DAYS_15_30.map(d => {
-          const isDone = done15_30.has(d.day);
-          const isCur = d.day === todayDay;
-          return `
-            <div class="m1-day-card ${isDone ? 'done' : ''} ${isCur ? 'current' : ''}">
-              <div style="display:flex;justify-content:space-between;align-items:center">
-                <span class="m1-tag">Day ${d.day} · W${d.week}</span>
-                <button type="button" class="m1-check-btn" data-toggle-day="${d.day}" title="ติ๊กผ่าน">${isDone ? '✅' : '○'}</button>
-              </div>
-              <div style="font-weight:700;margin:6px 0 3px">${core.escapeHtml(d.title)}</div>
-              <div class="m1-muted" style="font-size:12px;margin-bottom:8px">${core.escapeHtml(d.focus)}</div>
-              <div class="m1-chip-row">
-                ${d.words.map(w => `<button type="button" class="m1-chip hanzi-font" data-say="${core.escapeHtml(w)}">🔊 ${core.escapeHtml(w)}</button>`).join('')}
-              </div>
-              <div style="margin-top:10px">
-                <button type="button" class="btn-secondary m1-mini-btn" data-go-tab="${d.tab}">เปิดฝึกบทนี้ →</button>
-              </div>
-            </div>`;
-        }).join('')}
+        ${MONTH1_DAYS_15_30.map(d => renderDayCard(d, false)).join('')}
       </div>
     </div>
   `;
 
   body.querySelector('#m1-start-guided')?.addEventListener('click', () => {
-    renderGuidedRunner(core, body, () => renderMonth1Tab(core, rootHost));
+    renderGuidedRunner(core, body, () => renderMonth1Tab(core, rootHost), { targetDay: todayDay });
   });
   body.querySelector('#m1-beginner-chk')?.addEventListener('change', (e) => {
     toggleBeginnerMode(core, e.target.checked);
   });
   body.querySelector('#m1-go-plan14')?.addEventListener('click', () => core.switchTab('plan'));
+  body.querySelectorAll('[data-open-plan14]').forEach(b => b.addEventListener('click', () => {
+    core.state.selectedDay = Number(b.dataset.openPlan14) || 1;
+    core.switchTab('plan');
+  }));
   body.querySelectorAll('[data-say]').forEach(b => b.addEventListener('click', () => core.speak(b.dataset.say)));
   body.querySelectorAll('[data-go-tab]').forEach(b => b.addEventListener('click', () => {
     if (b.dataset.goTab === 'month1') { uiState.subTab = 'tones'; renderMonth1Tab(core, rootHost); }
     else core.switchTab(b.dataset.goTab);
   }));
-  body.querySelectorAll('[data-toggle-day]').forEach(b => b.addEventListener('click', () => {
-    const dNum = Number(b.dataset.toggleDay);
-    core.setExt('month1', (cur) => {
-      const s = new Set(Array.isArray(cur.doneDays) ? cur.doneDays : []);
-      if (s.has(dNum)) s.delete(dNum); else s.add(dNum);
-      cur.doneDays = [...s];
-      return cur;
-    }, { save: true, reason: `อัปเดต Day ${dNum}` });
-    renderMonth1Tab(core, rootHost);
+  body.querySelectorAll('[data-launch-day]').forEach(b => b.addEventListener('click', () => {
+    const dNum = Number(b.dataset.launchDay) || 1;
+    renderGuidedRunner(core, body, () => renderMonth1Tab(core, rootHost), { targetDay: dNum });
+    body.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   }));
 }
 

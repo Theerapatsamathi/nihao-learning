@@ -38,7 +38,7 @@ if (typeof window !== 'undefined') {
   }
   const STORAGE_KEY = 'nihao-level1-v2';
 
-  const DAILY_PASS_SCORE = 8;
+  const DAILY_PASS_SCORE = 10; // Requires >= 95% Daily Mastery Gate to pass a day
 
   function todayKey(offsetDays = 0) {
     const d = new Date();
@@ -5553,36 +5553,65 @@ if (typeof window !== 'undefined') {
     const total = dayObj.quiz.length;
 
     if (!dq.started) {
+      const m1Ext = (state.progress.ext && state.progress.ext.month1) || {};
+      const mRec = m1Ext.dayMastery && m1Ext.dayMastery[dayObj.day];
       const best = state.progress.dayScores[dayObj.day];
+      const passedDay = mRec ? (Number(mRec.bestPct || 0) >= 95 && Boolean(mRec.passed)) : (best !== undefined && best >= DAILY_PASS_SCORE);
+      const badgeLabel = mRec && mRec.attempts > 0
+        ? (passedDay ? `✅ สอบผ่านแล้ว (${mRec.bestPct}%)` : `⏳ ล่าสุด ${mRec.lastPct}% · ต้องถึง 95%`)
+        : (passedDay ? `✅ สอบผ่านแล้ว` : `เกณฑ์ผ่าน ≥ 95% (19/20 คะแนน)`);
+
       card.innerHTML = `
         <div class="dq-header">
-          <h4>แบบทดสอบเข้มข้นประจำวัน · Day ${dayObj.day} (${total} ข้อ)</h4>
-          <span class="streak-badge">${best !== undefined ? `สถิติสูงสุด: ${best}/${total}` : `เกณฑ์ผ่าน ${DAILY_PASS_SCORE}/${total}`}</span>
+          <h4>🎯 สอบพิสูจน์รู้จริงประจำวัน · Day ${dayObj.day} (เกณฑ์ผ่าน ≥ 95%)</h4>
+          <span class="streak-badge">${escapeHtml(badgeLabel)}</span>
         </div>
         <p style="margin:0 0 14px;color:var(--sys-label-2);font-size:13.5px">
-          ทดสอบครบทั้งการฟังแยกเสียงจริงและทฤษฎีของ Day ${dayObj.day} จำนวน ${total} ข้อ — ทำผ่าน ${DAILY_PASS_SCORE}/${total} เพื่อปลดล็อกเครื่องหมายผ่านประจำวัน
+          วัดผลครบทุกทักษะ: <b>ทวนคำเดิมปิดโพย + ฟังแยกเสียง + ทฤษฎี Day ${dayObj.day} + เรียงประโยค + พูดออกไมค์จริงโดยซ่อนพินอิน</b> (รวม 20 คะแนน — หากยังไม่ถึง 95% จะถือว่ายังไม่จบวันนี้ ต้องกลับมาทบทวนและสอบใหม่จนกว่าจะผ่าน)
         </p>
-        <button type="button" class="btn-primary" id="dq-start">เริ่มทำข้อสอบ Day ${dayObj.day} (${total} ข้อ) →</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button type="button" class="btn-primary" id="dq-start">📝 เริ่มสอบวัดผล Day ${dayObj.day} (เกณฑ์ ≥ 95%) →</button>
+          <button type="button" class="btn-secondary" id="dq-guided-study">📖 เข้าโหมดเรียนซ้อม + สอบครบชุด</button>
+        </div>
       `;
       document.getElementById('dq-start').addEventListener('click', () => {
+        if (typeof window.__nihaoRenderMasteryExam === 'function') {
+          window.__nihaoRenderMasteryExam(card, dayObj.day, (res) => {
+            if (res && res.passed && res.nextDay && res.nextDay <= PLAN.length) {
+              state.selectedDay = res.nextDay;
+            }
+            state.dailyQuiz = { idx: 0, score: 0, answered: false, started: false };
+            renderDailyPlan();
+          });
+          return;
+        }
         state.dailyQuiz = { idx: 0, score: 0, answered: false, started: true };
         renderDailyQuizCard();
+      });
+      document.getElementById('dq-guided-study')?.addEventListener('click', () => {
+        if (typeof window.__nihaoRenderGuidedDay === 'function') {
+          window.__nihaoRenderGuidedDay(card, dayObj.day, () => {
+            state.dailyQuiz = { idx: 0, score: 0, answered: false, started: false };
+            renderDailyPlan();
+          });
+        }
       });
       return;
     }
 
     if (dq.idx >= total) {
-      const passed = dq.score >= DAILY_PASS_SCORE;
+      const pct = Math.floor((dq.score / total) * 100);
+      const passed = pct >= 95;
       const nextDay = dayObj.day < PLAN.length ? dayObj.day + 1 : null;
       card.innerHTML = `
         <div style="text-align:center;padding:12px 6px">
           <h4 style="margin:0 0 6px;font-size:20px">
-            ${passed ? `ผ่าน Day ${dayObj.day} เรียบร้อยแล้ว ✓` : `ได้ ${dq.score}/${total} คะแนน — ลองทบทวนแล้วสอบใหม่`}
+            ${passed ? `✅ ผ่าน Day ${dayObj.day} เรียบร้อยแล้ว (${pct}%)` : `❌ ได้ ${pct}% (${dq.score}/${total}) — ยังไม่ถึงเกณฑ์ 95% ถือว่ายังไม่จบวันนี้`}
           </h4>
-          <p style="margin:0 0 16px;color:var(--sys-label-2)">คะแนนรอบนี้: <b class="tabular-nums">${dq.score} / ${total}</b> (เกณฑ์ผ่าน ${DAILY_PASS_SCORE}/${total})</p>
+          <p style="margin:0 0 16px;color:var(--sys-label-2)">คะแนนรอบนี้: <b class="tabular-nums">${dq.score} / ${total} (${pct}%)</b> · ต้องได้ ≥ 95% จึงจะผ่าน</p>
           <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
-            <button type="button" class="btn-secondary" id="dq-retry">ทำควิซ Day ${dayObj.day} ใหม่</button>
-            ${nextDay ? `<button type="button" class="btn-primary" id="dq-next-day">ไปเรียน Day ${nextDay} ต่อเลย →</button>` : ''}
+            <button type="button" class="btn-primary" id="dq-retry">📖 ทบทวนแล้วสอบ Day ${dayObj.day} ใหม่</button>
+            ${passed && nextDay ? `<button type="button" class="btn-secondary" id="dq-next-day">ไปเรียน Day ${nextDay} ต่อเลย →</button>` : ''}
           </div>
         </div>
       `;
