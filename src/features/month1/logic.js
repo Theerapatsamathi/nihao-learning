@@ -161,26 +161,81 @@ export function buildGuidedSession(dayNum, mistakes = []) {
   return { day: safeDay, meta: dayMeta, warmup, toneFocus, speakItems, mnemFocus };
 }
 
+// Core starter characters whose Pinyin gradually fades in the second half of Month 1 (Day 15–30)
+const TIER1_BASIC_CHARS = new Set(['我', '你', '好', '人', '大', '小', '一', '不', '口', '水', '火', '山']);
+const TIER2_CORE_CHARS = new Set([
+  ...TIER1_BASIC_CHARS,
+  '是', '的', '了', '吗', '什', '么', '谢', '再', '见', '吃', '喝', '茶', '米', '钱', '买', '去', '来', '回', '中', '国', '天', '上', '下'
+]);
+
 /**
- * Splits a Chinese sentence into 3-6 meaningful tiles for sentence-order assembly questions.
+ * Formats Pinyin scaffolding according to the day's difficulty tier:
+ * - Day 1–14: Full Pinyin shown on all characters/words (HSK 1–2 beginner standard).
+ * - Day 15–22: Masks Pinyin only on Tier-1 ultra-basic characters; keeps Pinyin on everything else.
+ * - Day 23–30: Masks Pinyin on Tier-1 & Tier-2 core characters; keeps Pinyin on harder/new words.
  */
-export function tokenizeSentenceForOrder(hzStr) {
+export function getProgressivePinyin(hzStr, pyStr, dayNum = 1) {
+  const safeDay = Math.max(1, Math.min(30, Number(dayNum) || 1));
+  const cleanPy = String(pyStr || '').trim();
+  if (!cleanPy) return '';
+  if (safeDay <= 14) return cleanPy;
+
+  const maskSet = safeDay <= 22 ? TIER1_BASIC_CHARS : TIER2_CORE_CHARS;
+  const chars = [...normalizeChinese(hzStr)];
+  const syls = splitPinyinSyllables(cleanPy);
+  if (!chars.length || chars.length !== syls.length) {
+    // If all characters in a short word belong to maskSet, hide; otherwise keep full pinyin for clarity
+    if (chars.length > 0 && chars.every(c => maskSet.has(c))) return '';
+    return cleanPy;
+  }
+  const masked = syls.map((syl, i) => (maskSet.has(chars[i]) ? '••' : syl));
+  if (masked.every(x => x === '••')) return '';
+  return masked.join(' ');
+}
+
+export function formatHzWithProgressivePinyin(hzStr, pyStr, dayNum = 1) {
+  const pyHint = getProgressivePinyin(hzStr, pyStr, dayNum);
+  return pyHint ? `${hzStr} (${pyHint})` : hzStr;
+}
+
+/**
+ * Splits a Chinese sentence into 3-6 meaningful tiles with progressive Pinyin hints for word-order questions.
+ */
+export function tokenizeSentenceForOrder(hzStr, pyStr = '', dayNum = 1) {
   const clean = String(hzStr || '')
     .replace(/…/g, '')
     .replace(/\s*\/\s*.*/, '')
     .replace(/[。！？!?.,，\s]/g, '')
     .trim();
   const chars = [...clean];
-  if (chars.length <= 4) return chars;
-  // Group into chunks of 1-2 characters so total tiles stay between 4 and 6
+  const syls = splitPinyinSyllables(String(pyStr || '').replace(/\s*\/\s*.*/, ''));
+  const hasExactSylMap = chars.length > 0 && syls.length === chars.length;
+
+  const maskSet = dayNum <= 14 ? null : (dayNum <= 22 ? TIER1_BASIC_CHARS : TIER2_CORE_CHARS);
+  const buildTileObj = (sliceChars, startIdx) => {
+    const text = sliceChars.join('');
+    if (!hasExactSylMap) return { hz: text, py: dayNum <= 14 ? pyStr : '' };
+    const sliceSyls = syls.slice(startIdx, startIdx + sliceChars.length);
+    if (!maskSet) {
+      return { hz: text, py: sliceSyls.join('') };
+    }
+    if (sliceChars.every(c => maskSet.has(c))) {
+      return { hz: text, py: '' };
+    }
+    return { hz: text, py: sliceSyls.join('') };
+  };
+
+  if (chars.length <= 4) {
+    return chars.map((ch, idx) => buildTileObj([ch], idx));
+  }
   const tiles = [];
   let i = 0;
   while (i < chars.length) {
     if (chars.length - i > 4 && tiles.length < 4) {
-      tiles.push(chars.slice(i, i + 2).join(''));
+      tiles.push(buildTileObj(chars.slice(i, i + 2), i));
       i += 2;
     } else {
-      tiles.push(chars[i]);
+      tiles.push(buildTileObj([chars[i]], i));
       i += 1;
     }
   }
@@ -189,12 +244,11 @@ export function tokenizeSentenceForOrder(hzStr) {
 
 /**
  * Builds a complete, randomized 20-point Daily Mastery Exam for Day 1..30:
- * - 14 objective questions (1 pt each = 14 pts):
- *   * Active Recall of prior days / mistakes (3 Qs)
- *   * Listening & Tone-Pair Ear Check / Curated Day Plan Quiz (5 Qs)
- *   * Thai -> Chinese Closed-Book Recall (3 Qs)
- *   * Sentence Word-Order Tile Assembly (3 Qs)
- * - 3 real speaking prompts without Pinyin (2 pts each = 6 pts)
+ * - Progressive Pinyin scaffolding:
+ *   * Day 1–14: Full Pinyin on reading, recall, and sentence-order tiles (HSK 1 standard).
+ *   * Day 15–30: Gradually hides Pinyin only on basic mastered characters while keeping Pinyin on new/longer words.
+ * - 14 objective questions (1 pt each = 14 pts)
+ * - 3 real speaking prompts WITH Pinyin + 1 reference audio replay allowed per prompt (2 pts each = 6 pts)
  * Passing requires >= 95% (>= 19.0 / 20 points).
  */
 export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = [], seed = Date.now() } = {}) {
@@ -218,17 +272,18 @@ export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = []
     return out;
   };
 
-  // 1) 3 Active Recall questions (from mistakes + prior days)
+  // 1) 3 Active Recall questions (with progressive Pinyin + audio support)
   for (let i = 0; i < 3; i++) {
     const target = session.warmup[i % session.warmup.length];
     const distractors = pickDistractors(SURVIVAL_50, target.th, x => x.th, 3);
     const opts = shuffleWithRng([target.th, ...distractors.map(d => d.th)], rng);
+    const displayTerm = formatHzWithProgressivePinyin(target.hz, target.py, safeDay);
     questions.push({
       id: `recall-${i}`,
       kind: 'choice',
       category: 'ทวนความจำสะสม',
-      prompt: `คำว่า "${target.hz}" มีความหมายตรงกับข้อใด? (ห้ามดูพินอิน)`,
-      audioHz: target.hz,
+      prompt: `ประโยค/คำว่า "${displayTerm}" มีความหมายตรงกับข้อใด?`,
+      audioHz: target.hz.replace(/…/g, ''),
       hidePromptHz: false,
       options: opts,
       answer: opts.indexOf(target.th),
@@ -257,7 +312,7 @@ export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = []
       });
     });
   } else {
-    // Pure audio comprehension (no Chinese text shown — ear test only!)
+    // Pure audio comprehension (ear test — listen to Chinese audio -> choose Thai meaning!)
     for (let i = 0; i < 3; i++) {
       const target = session.speakItems[i % session.speakItems.length];
       const distractors = pickDistractors(SURVIVAL_50, target.th, x => x.th, 3);
@@ -265,8 +320,8 @@ export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = []
       questions.push({
         id: `listen-${i}`,
         kind: 'choice',
-        category: 'สอบฟังเสียงล้วน',
-        prompt: 'กดฟังเสียงพูดภาษาจีน แล้วเลือกความหมายที่ถูกต้อง (ซ่อนตัวอักษร)',
+        category: 'สอบฟังจับใจความ',
+        prompt: 'กดฟังเสียงพูดภาษาจีน แล้วเลือกความหมายภาษาไทยที่ถูกต้อง',
         audioHz: target.hz.replace(/…/g, ''),
         hidePromptHz: true,
         options: opts,
@@ -298,57 +353,63 @@ export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = []
     });
   });
 
-  // 3) 3 Closed-Book Thai -> Chinese Reading/Recall questions (2 sentences + 1 Hanzi mnemonic)
+  // 3) 3 Thai -> Chinese Expression & Visual Mnemonic questions (with progressive Pinyin!)
   for (let i = 0; i < 2; i++) {
     const target = session.speakItems[(i + 2) % session.speakItems.length];
     const distractors = pickDistractors(SURVIVAL_50, target.hz, x => x.hz, 3);
-    const opts = shuffleWithRng([target.hz, ...distractors.map(d => d.hz)], rng);
+    const formatChoice = (item) => formatHzWithProgressivePinyin(item.hz, item.py, safeDay);
+    const correctLabel = formatChoice(target);
+    const opts = shuffleWithRng([correctLabel, ...distractors.map(formatChoice)], rng);
     questions.push({
       id: `th2hz-${i}`,
       kind: 'choice',
-      category: 'แปลไทยเป็นจีน',
-      prompt: `ถ้าต้องการพูดว่า "${target.th}" ต้องใช้ประโยคใด?`,
+      category: 'เลือกประโยคภาษาจีน',
+      prompt: `ถ้าต้องการพูดว่า "${target.th}" ต้องพูดว่าอย่างไร?`,
       audioHz: '',
       hidePromptHz: false,
       options: opts,
-      answer: opts.indexOf(target.hz),
+      answer: opts.indexOf(correctLabel),
       refItem: { hz: target.hz, py: target.py, th: target.th },
-      explain: `"${target.th}" พูดเป็นภาษาจีนว่า ${target.hz} (${target.py})`
+      explain: `"${target.th}" พูดว่า ${target.hz} (${target.py})`
     });
   }
 
   const mnemTarget = session.mnemFocus[0];
   const mnemDistractors = pickDistractors(HANZI_MNEMONICS, mnemTarget.hz, x => x.hz, 3);
-  const mnemOpts = shuffleWithRng([mnemTarget.hz, ...mnemDistractors.map(m => m.hz)], rng);
+  const formatMnemOpt = (m) => safeDay <= 14 ? `${m.hz} (${m.py})` : m.hz;
+  const correctMnemOpt = formatMnemOpt(mnemTarget);
+  const mnemOpts = shuffleWithRng([correctMnemOpt, ...mnemDistractors.map(formatMnemOpt)], rng);
   questions.push({
     id: 'mnem-0',
     kind: 'choice',
-    category: 'จำตัวอักษรจีน',
-    prompt: `ตัวอักษรใดหมายถึง "${mnemTarget.th}" (${mnemTarget.parts})?`,
+    category: 'ภาพจำตัวอักษรจีน',
+    prompt: `จากภาพจำ "${mnemTarget.story}" — ตัวอักษรใดแปลว่า "${mnemTarget.th}"?`,
     audioHz: '',
     hidePromptHz: false,
     options: mnemOpts,
-    answer: mnemOpts.indexOf(mnemTarget.hz),
+    answer: mnemOpts.indexOf(correctMnemOpt),
     refItem: { hz: mnemTarget.hz, py: mnemTarget.py, th: mnemTarget.th },
     explain: `${mnemTarget.hz} (${mnemTarget.py}) แปลว่า "${mnemTarget.th}" — ${mnemTarget.story}`
   });
 
-  // 4) 3 Sentence Word-Order Assembly questions
+  // 4) 3 Sentence Word-Order Assembly questions (tiles carry progressive Pinyin!)
   const orderPool = session.speakItems.filter(s => normalizeChinese(s.hz).length >= 3);
   const pickedOrders = shuffleWithRng(orderPool.length >= 3 ? orderPool : SURVIVAL_50.filter(s => normalizeChinese(s.hz).length >= 3), rng).slice(0, 3);
   pickedOrders.forEach((s, i) => {
-    const expectedTiles = tokenizeSentenceForOrder(s.hz);
-    let scrambled = shuffleWithRng(expectedTiles, rng);
-    if (scrambled.join('') === expectedTiles.join('') && scrambled.length > 1) {
-      scrambled = [...scrambled.slice(1), scrambled[0]];
+    const expectedTileObjs = tokenizeSentenceForOrder(s.hz, s.py, safeDay);
+    let scrambledObjs = shuffleWithRng(expectedTileObjs, rng);
+    const expectedHz = expectedTileObjs.map(t => t.hz).join('');
+    if (scrambledObjs.map(t => t.hz).join('') === expectedHz && scrambledObjs.length > 1) {
+      scrambledObjs = [...scrambledObjs.slice(1), scrambledObjs[0]];
     }
     questions.push({
       id: `order-${i}`,
       kind: 'order',
       category: 'เรียงคำแต่งประโยค',
-      prompt: `เรียงคำภาษาจีนให้เป็นประโยคที่หมายถึง: "${s.th}"`,
-      expectedHz: expectedTiles.join(''),
-      tiles: scrambled,
+      prompt: `เรียงคำให้เป็นประโยคที่หมายถึง: "${s.th}"`,
+      expectedHz,
+      tiles: scrambledObjs.map(t => t.hz),
+      tilePinyins: scrambledObjs.map(t => t.py || ''),
       refItem: { hz: s.hz, py: s.py, th: s.th },
       explain: `ลำดับที่ถูกต้องคือ ${s.hz} (${s.py})`
     });
@@ -357,7 +418,7 @@ export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = []
   // Ensure exact EXAM_QUIZ_COUNT (14) shuffled questions
   const finalQuestions = shuffleWithRng(questions.slice(0, EXAM_QUIZ_COUNT), rng);
 
-  // 5) 3 Real Speaking Exam Items (Pinyin hidden!)
+  // 5) 3 Real Speaking Exam Items (shows Pinyin + allows 1 reference audio listen before recording!)
   const cleanSpeakCandidates = session.speakItems
     .map(s => ({
       hz: s.hz.replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim(),
@@ -371,6 +432,7 @@ export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = []
 
   return {
     day: safeDay,
+    scaffoldingTier: safeDay <= 14 ? 'full-pinyin' : (safeDay <= 22 ? 'partial-fade' : 'core-fade'),
     passPct: DAILY_MASTERY_PASS_PCT,
     totalPoints: EXAM_TOTAL_POINTS,
     questions: finalQuestions,
@@ -388,14 +450,14 @@ export function gradeSpeakingExamItem({ targetHz, targetPy, heardText = '', type
     const result = scorePronunciation(targetHz, targetPy, heardText, charPinyinMap);
     const pronScore = result.score;
     let points = 0;
-    let gradeLabel = 'ยังไม่ผ่าน — ออกเสียงใหม่อีกครั้ง';
-    if (pronScore >= 90) {
+    let gradeLabel = 'ยังไม่ผ่าน — ลองออกเสียงชัดๆ อีกครั้งนะ';
+    if (pronScore >= 85) {
       points = 2.0;
-      gradeLabel = 'ยอดเยี่ยม! ออกเสียงชัดเป๊ะ (2/2 คะแนน)';
-    } else if (pronScore >= 75) {
+      gradeLabel = 'ยอดเยี่ยม! ออกเสียงและวรรณยุกต์ชัดเจน (2/2 คะแนน)';
+    } else if (pronScore >= 70) {
       points = 1.5;
       gradeLabel = 'ดีมาก! ใกล้เคียงต้นฉบับ (1.5/2 คะแนน)';
-    } else if (pronScore >= 50) {
+    } else if (pronScore >= 45) {
       points = 0.5;
       gradeLabel = 'ได้ยินบางคำ แต่ยังไม่ชัดเจน (0.5/2 คะแนน)';
     }

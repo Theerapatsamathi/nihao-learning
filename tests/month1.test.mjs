@@ -136,3 +136,27 @@ test('buildDailyMasteryExam & gradeSpeakingExamItem verify closed-book recall, o
   assert.equal(tonelessPy.points, 1);
   assert.equal(tonelessPy.passedItem, false);
 });
+
+import { getProgressivePinyin } from '../src/features/month1/logic.js';
+
+test('Progressive Pinyin scaffolding: Day 1-14 keeps full pinyin, Day 15-30 fades basic chars gradually', () => {
+  // Day 1-14: full pinyin always shown
+  assert.equal(getProgressivePinyin('我是泰国人', 'Wǒ shì Tàiguórén', 1), 'Wǒ shì Tàiguórén');
+  assert.equal(getProgressivePinyin('我是泰国人', 'Wǒ shì Tàiguórén', 14), 'Wǒ shì Tàiguórén');
+
+  // Day 18 (15-22): masks Tier-1 basic chars (我, 人) while keeping harder syllables (shì, Tài, guó)
+  const midPy = getProgressivePinyin('我是泰国人', 'Wǒ shì Tàiguórén', 18);
+  assert.ok(midPy.includes('••'));
+  assert.ok(midPy.includes('Tài'));
+
+  // Day 26 (23-30): masks more core chars (我, 是, 国, 人) while still keeping unfamiliar Tài
+  const latePy = getProgressivePinyin('我是泰国人', 'Wǒ shì Tàiguórén', 26);
+  assert.ok(latePy.includes('Tài'));
+
+  // Day 1 word-order tiles include pinyin for every tile
+  const examDay1 = buildDailyMasteryExam(1, { seed: 42 });
+  const orderQ = examDay1.questions.find(q => q.kind === 'order');
+  assert.ok(orderQ);
+  assert.equal(orderQ.tiles.length, orderQ.tilePinyins.length);
+  assert.ok(orderQ.tilePinyins.every(p => p.length > 0));
+});

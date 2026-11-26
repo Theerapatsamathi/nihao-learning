@@ -6,7 +6,8 @@ import {
   gradeSpeakingExamItem,
   evaluateDailyMasteryAttempt,
   getTodayBlueprintDay,
-  getDayMasteryRecord
+  getDayMasteryRecord,
+  getProgressivePinyin
 } from './logic.js';
 import { SURVIVAL_50 } from './data-month1.js';
 import { hasSpeechRecognition, startSpeechRecognition, getCharPinyinMap, addToReviewQueue } from '../speak-studio/speech.js';
@@ -107,6 +108,7 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
   let sIdx = 0;
   const speakResults = new Array(exam.speakingPrompts.length).fill(null);
   const speakTriesUsed = new Array(exam.speakingPrompts.length).fill(0);
+  const speakModelUsed = new Array(exam.speakingPrompts.length).fill(false);
   let micListening = false;
   let liveHeardText = '';
   let liveErrorMsg = '';
@@ -244,7 +246,7 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
               <strong class="tabular-nums">${evalRes.quizCorrect} / ${evalRes.quizTotal} (${evalRes.quizPct}%)</strong>
             </div>
             <div class="m1-score-box">
-              <span>🎙️ พูดออกไมค์โดยไม่ดูพินอิน</span>
+              <span>🎙️ สอบพูดออกเสียงตามพินอิน</span>
               <strong class="tabular-nums">${evalRes.speakingPoints} / ${evalRes.speakingMax} (${evalRes.speakPct}%)</strong>
             </div>
           </div>
@@ -329,16 +331,26 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
           </div>
           <div class="m1-prog"><div class="m1-prog-fill" style="width:${Math.max(6, pctBar)}%"></div></div>
 
-          <div class="m1-order-answer hanzi-font" id="m1-order-slot">
+          <div class="m1-order-answer" id="m1-order-slot">
             ${selectedOrderIndices.length
-              ? selectedOrderIndices.map((tileIdx, pos) => `<button type="button" class="m1-order-chip chosen" data-unpick="${pos}">${core.escapeHtml(q.tiles[tileIdx])}</button>`).join('')
+              ? selectedOrderIndices.map((tileIdx, pos) => {
+                const tPy = q.tilePinyins?.[tileIdx] || '';
+                return `<button type="button" class="m1-order-chip chosen" data-unpick="${pos}">
+                  <span class="hanzi-font">${core.escapeHtml(q.tiles[tileIdx])}</span>
+                  ${tPy ? `<small class="m1-tile-py">${core.escapeHtml(tPy)}</small>` : ''}
+                </button>`;
+              }).join('')
               : '<span class="m1-muted" style="font-size:14px">แตะคำด้านล่างมาวางเรียงตรงนี้...</span>'}
           </div>
 
           <div class="m1-order-bank">
             ${q.tiles.map((t, idx) => {
               const used = selectedOrderIndices.includes(idx);
-              return `<button type="button" class="m1-order-chip hanzi-font" data-pick-tile="${idx}" ${used ? 'disabled' : ''}>${core.escapeHtml(t)}</button>`;
+              const tPy = q.tilePinyins?.[idx] || '';
+              return `<button type="button" class="m1-order-chip" data-pick-tile="${idx}" ${used ? 'disabled' : ''}>
+                <span class="hanzi-font">${core.escapeHtml(t)}</span>
+                ${tPy ? `<small class="m1-tile-py">${core.escapeHtml(tPy)}</small>` : ''}
+              </button>`;
             }).join('')}
           </div>
 
@@ -465,6 +477,7 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
     const sp = exam.speakingPrompts[sIdx];
     const curRes = speakResults[sIdx];
     const tries = speakTriesUsed[sIdx];
+    const modelPlayed = speakModelUsed[sIdx];
     const maxTries = 2;
     const srSupported = hasSpeechRecognition();
     const totalSteps = exam.questions.length + exam.speakingPrompts.length;
@@ -474,18 +487,24 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
       <div class="card-panel m1-runner">
         <div class="m1-runner-head">
           <div>
-            <span class="m1-tag">🎙️ สอบพูดออกไมค์จริง Day ${dayNum} · ประโยคที่ ${sIdx + 1}/${exam.speakingPrompts.length} (ซ่อนพินอิน!)</span>
-            <h3 style="margin:6px 0 2px">พูดประโยคนี้เป็นภาษาจีนให้ชัดเจน (2 คะแนน)</h3>
-            <p class="m1-muted" style="margin:0;font-size:12.5px">พิสูจน์ว่าจำเสียงอ่านและพูดออกปากได้จริงโดยไม่พึ่งพินอิน (พูดได้สูงสุด ${maxTries} ครั้ง ระบบเก็บคะแนนรอบที่ดีที่สุด)</p>
+            <span class="m1-tag">🎙️ สอบพูดออกไมค์จริง Day ${dayNum} · ประโยคที่ ${sIdx + 1}/${exam.speakingPrompts.length} (มีพินอิน + ฟังตัวอย่างได้ 1 ครั้ง)</span>
+            <h3 style="margin:6px 0 2px">อ่านออกเสียงประโยคภาษาจีนนี้ให้ชัดเจน (2 คะแนน)</h3>
+            <p class="m1-muted" style="margin:0;font-size:12.5px">ดูพินอินและฟังต้นฉบับนำได้ 1 ครั้ง จากนั้นกดอัดเสียงพูดให้ชัดและถูกวรรณยุกต์ (อัดได้สูงสุด ${maxTries} ครั้ง เก็บรอบที่ดีที่สุด)</p>
           </div>
           <button type="button" class="btn-secondary m1-mini-btn" id="m1-exam-exit">ออก</button>
         </div>
         <div class="m1-prog"><div class="m1-prog-fill" style="width:${pctBar}%"></div></div>
 
         <div class="m1-speak-exam-box">
-          <div class="m1-muted" style="font-size:13px;margin-bottom:4px">ความหมายที่ต้องพูด:</div>
-          <div style="font-size:18px;font-weight:700;margin-bottom:8px">"${core.escapeHtml(sp.th)}"</div>
-          <div class="hanzi-font" style="font-size:32px;font-weight:700;letter-spacing:2px;margin-bottom:14px">${core.escapeHtml(sp.hz)}</div>
+          <div class="m1-muted" style="font-size:13px;margin-bottom:4px">ความหมาย: "${core.escapeHtml(sp.th)}"</div>
+          <div class="hanzi-font" style="font-size:32px;font-weight:700;letter-spacing:2px;margin-bottom:4px">${core.escapeHtml(sp.hz)}</div>
+          <div class="m1-py" style="font-size:18px;margin-bottom:14px">${core.escapeHtml(sp.py)}</div>
+
+          <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <button type="button" class="btn-secondary" id="m1-exam-model-once" ${modelPlayed || micListening ? 'disabled' : ''}>
+              ${modelPlayed ? '✓ ฟังเสียงต้นฉบับครบ 1/1 ครั้งแล้ว' : '🔊 ฟังเสียงต้นฉบับนำ (1/1 ครั้ง)'}
+            </button>
+          </div>
 
           ${srSupported ? `
             <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
@@ -498,11 +517,11 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
           ` : `
             <div class="m1-fallback-dictation">
               <div class="m1-muted" style="font-size:12.5px;margin-bottom:6px">
-                ⚠️ เบราว์เซอร์นี้ไม่รองรับไมค์ Web Speech — กรุณาพิมพ์พินอินพร้อมเลขวรรณยุกต์ทุกพยางค์แทน (เช่น <code>wo3 shi4 tai4 guo2 ren2</code>)
+                ⚠️ เบราว์เซอร์นี้ไม่รองรับไมค์ Web Speech — กรุณาพิมพ์พินอินพร้อมเลขวรรณยุกต์ทุกพยางค์เพื่อยืนยันการออกเสียง (เช่น <code>wo3 shi4 tai4 guo2 ren2</code>)
               </div>
               <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
                 <input type="text" id="m1-py-fallback-in" class="vb-search" style="max-width:300px" placeholder="พิมพ์พินอิน + เลขวรรณยุกต์ 1-4...">
-                <button type="button" class="btn-primary" id="m1-py-fallback-btn" ${tries >= maxTries ? 'disabled' : ''}>ตรวจพินอิน (${tries}/${maxTries})</button>
+                <button type="button" class="btn-primary" id="m1-py-fallback-btn" ${tries >= maxTries ? 'disabled' : ''}>ตรวจวรรณยุกต์ (${tries}/${maxTries})</button>
               </div>
             </div>
           `}
@@ -527,6 +546,12 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
     `;
 
     host.querySelector('#m1-exam-exit')?.addEventListener('click', () => { stopMic(); onExit?.(); });
+    host.querySelector('#m1-exam-model-once')?.addEventListener('click', () => {
+      if (speakModelUsed[sIdx]) return;
+      speakModelUsed[sIdx] = true;
+      core.speak(sp.hz);
+      renderSpeakStep();
+    });
 
     host.querySelector('#m1-exam-mic')?.addEventListener('click', () => {
       if (micListening) {
@@ -665,13 +690,16 @@ export function renderGuidedRunner(core, host, onDone, opts = {}) {
   const draw = () => {
     if (step === 0) {
       const allDone = checkedWarmup.size >= session.warmup.length;
+      const pyNote = session.day <= 14
+        ? 'มีพินอินกำกับให้ครบเหมือน HSK 1 — กดฟังเสียงแล้วเลือกความหมายภาษาไทยให้ถูกทุกข้อ'
+        : 'โหมดครึ่งเดือนหลัง: ค่อยๆ ซ่อนพินอินเฉพาะคำพื้นฐานที่คุ้นแล้ว กดฟังเสียงช่วยได้';
       host.innerHTML = `
         <div class="card-panel m1-runner">
           <div class="m1-runner-head">
             <div>
-              <span class="m1-tag">Day ${session.day} · ขั้นที่ 1/4 (ทวนความจำแบบปิดโพย)</span>
+              <span class="m1-tag">Day ${session.day} · ขั้นที่ 1/4 (ทวนความจำคำเดิม)</span>
               <h2 style="margin:6px 0 2px">🔄 ทดสอบทวนคำเดิมก่อนเริ่มบทใหม่ (${checkedWarmup.size}/${session.warmup.length})</h2>
-              <p class="m1-muted" style="margin:0">กดฟังเสียงแล้วเลือกความหมายให้ถูกต้องครบทุกข้อ (ซ่อนพินอินเพื่อเช็กว่าจำได้จริง)</p>
+              <p class="m1-muted" style="margin:0">${pyNote}</p>
             </div>
             <button type="button" class="btn-secondary" id="m1-run-exit">ออก</button>
           </div>
@@ -680,12 +708,15 @@ export function renderGuidedRunner(core, host, onDone, opts = {}) {
             ${session.warmup.map((w, i) => {
               const isOk = checkedWarmup.has(i);
               const fb = warmupFeedback[i] || '';
+              const pyHint = getProgressivePinyin(w.hz, w.py, session.day);
               return `
                 <div class="m1-item ${isOk ? 'done' : ''}" style="flex-direction:column;align-items:stretch">
                   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
                     <div class="m1-hz hanzi-font">
                       ${core.escapeHtml(w.hz)}
-                      ${isOk ? `<span class="m1-py">${core.escapeHtml(w.py)} · ${core.escapeHtml(w.th)}</span>` : '<span class="m1-muted" style="font-size:12px;font-weight:500">(ซ่อนพินอิน)</span>'}
+                      ${isOk
+                        ? `<span class="m1-py">${core.escapeHtml(w.py)} · ${core.escapeHtml(w.th)}</span>`
+                        : (pyHint ? `<span class="m1-py">${core.escapeHtml(pyHint)}</span>` : '')}
                     </div>
                     <button type="button" class="btn-secondary m1-mini-btn" data-play="${i}">🔊 ฟังเสียง</button>
                   </div>
@@ -757,6 +788,21 @@ export function renderGuidedRunner(core, host, onDone, opts = {}) {
                 </div>`;
             }).join('')}
           </div>
+          <div class="m1-quiz-inline" style="margin-top:12px;margin-bottom:0">
+            <div style="font-weight:700;font-size:13.5px;margin-bottom:6px">🧠 ภาพจำตัวอักษรประจำวันนี้ (ออกสอบ 1 ข้อ):</div>
+            <div style="display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
+              ${session.mnemFocus.map((m, mi) => `
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--sys-bg-elevated,#fff)">
+                  <div>
+                    <span class="hanzi-font" style="font-size:22px;font-weight:700">${core.escapeHtml(m.hz)}</span>
+                    <span class="m1-py">${core.escapeHtml(m.py)} · ${core.escapeHtml(m.th)}</span>
+                    <div class="m1-muted" style="font-size:11.5px">${core.escapeHtml(m.story)}</div>
+                  </div>
+                  <button type="button" class="btn-secondary m1-mini-btn" data-mnem-say="${mi}">🔊</button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
           <div class="m1-runner-foot" style="justify-content:space-between">
             <button type="button" class="btn-secondary" id="m1-prev-step">← ย้อนกลับ</button>
             <button type="button" class="btn-primary" id="m1-next-step" ${allDone ? '' : 'disabled'}>
@@ -784,6 +830,10 @@ export function renderGuidedRunner(core, host, onDone, opts = {}) {
         core.playChime('ok', true);
         draw();
       }));
+      host.querySelectorAll('[data-mnem-say]').forEach(b => b.addEventListener('click', () => {
+        const m = session.mnemFocus[Number(b.dataset.mnemSay)];
+        if (m) core.speak(m.hz);
+      }));
       host.querySelector('#m1-prev-step')?.addEventListener('click', () => { step = 0; draw(); });
     } else if (step === 2) {
       const allDone = checkedSpeak.size >= session.speakItems.length;
@@ -794,7 +844,7 @@ export function renderGuidedRunner(core, host, onDone, opts = {}) {
             <div>
               <span class="m1-tag">Day ${session.day} · ขั้นที่ 3/4 (ซ้อมพูดก่อนเข้าห้องสอบ)</span>
               <h2 style="margin:6px 0 2px">🗣️ ซ้อมพูด 5 ประโยคประจำวัน (${checkedSpeak.size}/${session.speakItems.length})</h2>
-              <p class="m1-muted" style="margin:0">จำตัวจีนและเสียงอ่านให้แม่น! ในขั้นถัดไปจะต้อง <b>สอบพูดออกไมค์โดยซ่อนพินอิน</b> และทำคะแนนรวมให้ได้ ≥ ${DAILY_MASTERY_PASS_PCT}%</p>
+              <p class="m1-muted" style="margin:0">ฝึกออกเสียงตามพินอินให้คล่อง! ในขั้นสอบพูดจะมีพินอินให้ดู + กดฟังต้นฉบับนำได้ 1 ครั้งก่อนอัดไมค์ (เกณฑ์รวม ≥ ${DAILY_MASTERY_PASS_PCT}%)</p>
             </div>
             <button type="button" class="btn-secondary" id="m1-run-exit">ออก</button>
           </div>

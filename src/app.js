@@ -5567,7 +5567,7 @@ if (typeof window !== 'undefined') {
           <span class="streak-badge">${escapeHtml(badgeLabel)}</span>
         </div>
         <p style="margin:0 0 14px;color:var(--sys-label-2);font-size:13.5px">
-          วัดผลครบทุกทักษะ: <b>ทวนคำเดิมปิดโพย + ฟังแยกเสียง + ทฤษฎี Day ${dayObj.day} + เรียงประโยค + พูดออกไมค์จริงโดยซ่อนพินอิน</b> (รวม 20 คะแนน — หากยังไม่ถึง 95% จะถือว่ายังไม่จบวันนี้ ต้องกลับมาทบทวนและสอบใหม่จนกว่าจะผ่าน)
+          วัดผลครบทุกทักษะแบบ HSK จริง (มีพินอินกำกับช่วงปูพื้นฐาน Day 1–14): <b>ทวนความจำ + ฟังแยกเสียง + ทฤษฎี Day ${dayObj.day} + เรียงคำ + พูดออกไมค์จริง</b> (รวม 20 คะแนน — หากยังไม่ถึง 95% จะถือว่ายังไม่จบวันนี้ ต้องกลับมาทบทวนและสอบใหม่จนกว่าจะผ่าน)
         </p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button type="button" class="btn-primary" id="dq-start">📝 เริ่มสอบวัดผล Day ${dayObj.day} (เกณฑ์ ≥ 95%) →</button>
