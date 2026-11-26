@@ -96,5 +96,9 @@ if (core) {
     initUxEnhancements(core);
   });
   core.on('cloud-synced', () => ensureMasteryInitialized());
-  setTimeout(() => applyBeginnerMode(core), 200);
+  initUxEnhancements(core);
+  setTimeout(() => {
+    applyBeginnerMode(core);
+    initUxEnhancements(core);
+  }, 200);
 }
