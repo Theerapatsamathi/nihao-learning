@@ -18,7 +18,7 @@ import { scorePronunciation } from '../speak-studio/scoring.js';
 import { colorizePinyin, renderLiveScoreHud, renderMicWaveHtml } from './ux-utils.js';
 
 const BEGINNER_TABS = new Set([
-  'today', 'month1', 'analytics', 'copybook', 'arena', 'plan', 'lesson-path', 'writing', 'vocab', 'games-reading', 'speak-studio', 'settings-plus'
+  'today', 'month1', 'analytics', 'beijing', 'copybook', 'arena', 'plan', 'lesson-path', 'writing', 'vocab', 'games-reading', 'speak-studio', 'settings-plus'
 ]);
 
 export function applyBeginnerMode(core) {

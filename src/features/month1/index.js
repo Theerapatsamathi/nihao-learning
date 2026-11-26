@@ -6,6 +6,7 @@ import { renderMonth1Tab } from './views.js';
 import { renderCopybookTab } from './copybook.js';
 import { renderTodayDashboard } from './today-dashboard.js';
 import { renderAnalyticsTab } from './analytics-view.js';
+import { renderBeijingTab } from './beijing-view.js';
 import { initUxEnhancements } from './ux-utils.js';
 
 const core = window.NihaoCore;
@@ -55,6 +56,21 @@ if (core) {
     sectionTitle: '🏠 หน้าแรกวันนี้',
     render(host) {
       renderAnalyticsTab(core, host);
+    }
+  });
+
+  core.registerTab({
+    id: 'beijing',
+    label: 'ทริปปักกิ่ง 25 ม.ค.',
+    title: '✈️ ภารกิจพิชิตปักกิ่ง (6 เควสเอาตัวรอด + สอบก่อนขึ้นเครื่อง ≥95%)',
+    desc: 'นับถอยหลังวันบิน 25 ม.ค. พร้อม 48 ประโยคเด็ดปักกิ่ง (ตม./Didi/เป็ดปักกิ่ง/Alipay/ต่อราคา/หน้าหนาวติดลบ) และ Pre-Flight Boarding Exam',
+    emoji: '✈️',
+    iconClass: 'icon-red',
+    badge: '60D',
+    section: 'home',
+    sectionTitle: '🏠 หน้าแรกวันนี้',
+    render(host) {
+      renderBeijingTab(core, host);
     }
   });
 
