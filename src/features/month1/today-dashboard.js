@@ -23,6 +23,13 @@ import {
   renderWeaknessGrinder,
   renderWeeklyBossRunner
 } from './mastery-drills.js';
+import {
+  renderUnscriptedSpeakingRunner,
+  renderStreetListeningRunner,
+  renderPatternWorkshopRunner,
+  renderBlindDictationRunner
+} from './realworld-drills.js';
+import { realWorldProgress } from './realworld-logic.js';
 import { openQuickDict } from './quick-dict.js';
 
 export function renderTodayDashboard(core, host) {
@@ -39,6 +46,7 @@ export function renderTodayDashboard(core, host) {
   const dueVocabSrs = typeof core.getDueVocabSrsCount === 'function' ? core.getDueVocabSrsCount() : 0;
   const totalDueCards = dueM1Fsrs.length + dueVocabSrs;
   const beginnerOn = Boolean(ext.beginnerMode);
+  const rwp = realWorldProgress(ext.realWorld);
 
   let statusBadgeHtml = `<span class="m1-status-pill pending">🎯 เกณฑ์ผ่านประจำวัน ≥ ${DAILY_MASTERY_PASS_PCT}%</span>`;
   let primaryBtnLabel = dueM1Fsrs.length > 0 && !dayRec.passed
@@ -155,6 +163,41 @@ export function renderTodayDashboard(core, host) {
       </div>
     </div>
 
+    <div class="card-panel" style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <div>
+          <h3 style="margin:0">🌏 ด่านโลกจริง: ใช้ได้นอกตำรา ${rwp.certified ? '<span class="m1-status-pill pass">🏅 Real-World Certified</span>' : ''}</h3>
+          <div class="m1-muted" style="font-size:12.5px">ไม่มีสคริปต์ · ความเร็วคนจีนจริง · พลิกแพลงประโยค · เขียนจากความจำล้วน (ครบทุกด่านรับตรา Certified)</div>
+        </div>
+      </div>
+      <div class="m1-days-grid" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))">
+        <div class="m1-day-card ${rwp.unscripted ? 'done' : ''}">
+          <span class="m1-tag">🗣️ พูดสดไร้สคริปต์</span>
+          <div style="font-weight:700;margin:6px 0 4px">พูดตามสถานการณ์ ไม่มีตัวจีนให้ดู</div>
+          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">สั่งชานม ถามราคา ถามทาง — ต้องสื่อใจความครบ ≥ 95%</div>
+          <button type="button" class="btn-primary m1-mini-btn" id="td-rw-unscripted">${rwp.unscripted ? '✅ ' : ''}🗣️ เริ่มพูดสด →</button>
+        </div>
+        <div class="m1-day-card ${rwp.street === 3 ? 'done' : ''}">
+          <span class="m1-tag">🎧 ฟังคนจีนพูดจริง · ${rwp.street}/3 ระดับ</span>
+          <div style="font-weight:700;margin:6px 0 4px">เร็ว 1.2x + เสียงคาเฟ่/รถไฟใต้ดิน</div>
+          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">3 ระดับความสมจริง ผ่านต้อง ≥ 90% (9/10 ข้อ)</div>
+          <button type="button" class="btn-primary m1-mini-btn" id="td-rw-street">🎧 เลือกระดับฟัง →</button>
+        </div>
+        <div class="m1-day-card ${rwp.patterns >= 3 ? 'done' : ''}">
+          <span class="m1-tag">🧩 พลิกแพลงประโยค · ${rwp.patterns}/${rwp.patternTotal} โครงสร้าง</span>
+          <div style="font-weight:700;margin:6px 0 4px">โครงสร้างเดียว เปลี่ยนโจทย์รัวๆ 5 ข้อ</div>
+          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">是/不是 · 有/没有 · 想/要/会 · 在 · 疑问词 · 很/太…了</div>
+          <button type="button" class="btn-primary m1-mini-btn" id="td-rw-pattern">🧩 เข้าโรงฝึก →</button>
+        </div>
+        <div class="m1-day-card ${rwp.blindChars >= 10 ? 'done' : ''}">
+          <span class="m1-tag">✍️ เขียนไร้รอยประ · ${rwp.blindChars} ตัวที่เขียนได้</span>
+          <div style="font-weight:700;margin:6px 0 4px">เขียนตามคำบอก ไม่มีเส้นร่าง ไม่มีขีดใบ้</div>
+          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ลากขีดจากความจำ พลาดได้ไม่เกิน 1 ครั้งต่อตัว</div>
+          <button type="button" class="btn-primary m1-mini-btn" id="td-rw-blind">✍️ เริ่มเขียนล้วน →</button>
+        </div>
+      </div>
+    </div>
+
     <div class="m1-days-grid" style="margin-top:16px;grid-template-columns:repeat(auto-fit, minmax(250px, 1fr))">
       <!-- AI Handwriting Grader -->
       <div class="m1-day-card">
@@ -222,6 +265,10 @@ export function renderTodayDashboard(core, host) {
   host.querySelectorAll('[data-decay-day]').forEach(b => b.addEventListener('click', () => {
     renderDecayReverifyRunner(core, host, Number(b.dataset.decayDay), redrawSelf);
   }));
+  host.querySelector('#td-rw-unscripted')?.addEventListener('click', () => renderUnscriptedSpeakingRunner(core, host, redrawSelf));
+  host.querySelector('#td-rw-street')?.addEventListener('click', () => renderStreetListeningRunner(core, host, redrawSelf));
+  host.querySelector('#td-rw-pattern')?.addEventListener('click', () => renderPatternWorkshopRunner(core, host, redrawSelf));
+  host.querySelector('#td-rw-blind')?.addEventListener('click', () => renderBlindDictationRunner(core, host, redrawSelf));
   host.querySelector('#td-go-reflex')?.addEventListener('click', () => renderReflexSpeakingRunner(core, host, redrawSelf));
   host.querySelector('#td-go-weakness')?.addEventListener('click', () => renderWeaknessGrinder(core, host, redrawSelf));
   host.querySelectorAll('[data-boss-cp]').forEach(b => b.addEventListener('click', () => {

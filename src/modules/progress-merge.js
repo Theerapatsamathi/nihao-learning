@@ -194,6 +194,31 @@ export function mergeCloudProgressData(localP, cloudP) {
         (x) => (x?.srs?.reviews || 0) * 10 + (x?.srs?.step || 0)
       );
     }
+    if (mLocal.realWorld || mCloud.realWorld) {
+      const a = mLocal.realWorld || {};
+      const b = mCloud.realWorld || {};
+      const rw = { blindChars: uniqArr(a.blindChars, b.blindChars) };
+      for (const kind of ['unscripted', 'street', 'pattern', 'blind']) {
+        const ka = a[kind] || {};
+        const kb = b[kind] || {};
+        const out = {};
+        for (const key of new Set([...Object.keys(ka), ...Object.keys(kb)])) {
+          const ra = ka[key] || {};
+          const rb = kb[key] || {};
+          const newer = (Number(rb.updatedAt) || 0) >= (Number(ra.updatedAt) || 0) ? rb : ra;
+          out[key] = {
+            ...ra,
+            ...rb,
+            ...newer,
+            bestPct: Math.max(Number(ra.bestPct) || 0, Number(rb.bestPct) || 0),
+            attempts: Math.max(Number(ra.attempts) || 0, Number(rb.attempts) || 0),
+            passed: Boolean(ra.passed || rb.passed)
+          };
+        }
+        rw[kind] = out;
+      }
+      mergedM1.realWorld = rw;
+    }
     merged.ext.month1 = mergedM1;
   }
 
