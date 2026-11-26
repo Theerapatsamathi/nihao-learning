@@ -923,12 +923,19 @@ button:focus-visible {
    ========================================================================== */
 .initials-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.95fr);
   gap: 14px;
   align-items: start;
 }
 
-.group-block { margin-bottom: 18px; }
+#initials-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+  align-content: start;
+}
+
+.group-block { margin-bottom: 0; }
 .group-block:last-child { margin-bottom: 0; }
 .group-title h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
 .group-desc { font-size: 12.5px; color: var(--sys-label-2); margin: 0 0 8px; }
@@ -998,7 +1005,7 @@ button:focus-visible {
 
 .inspector-sticky {
   position: sticky;
-  top: 8px;
+  top: 64px;
 }
 
 .inspector-hero {
@@ -1722,6 +1729,7 @@ button:focus-visible {
   .combiner-layout,
   .writing-layout,
   .vocab-layout { grid-template-columns: minmax(0, 1fr); }
+  #initials-groups { grid-template-columns: minmax(0, 1fr); }
   .plan-sidebar { max-height: 280px; }
   .inspector-sticky { position: static; }
   .drill-selector { grid-template-columns: repeat(2, minmax(0, 1fr)); }
