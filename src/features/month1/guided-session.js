@@ -15,6 +15,7 @@ import { SURVIVAL_50 } from './data-month1.js';
 import { enrollDayInFsrs, renderFsrsQuizGate, renderWeeklyBossRunner } from './mastery-drills.js';
 import { hasSpeechRecognition, startSpeechRecognition, getCharPinyinMap, addToReviewQueue } from '../speak-studio/speech.js';
 import { scorePronunciation } from '../speak-studio/scoring.js';
+import { colorizePinyin, renderLiveScoreHud, renderMicWaveHtml } from './ux-utils.js';
 
 const BEGINNER_TABS = new Set([
   'today', 'month1', 'copybook', 'arena', 'plan', 'lesson-path', 'writing', 'vocab', 'games-reading', 'speak-studio', 'settings-plus'
@@ -322,6 +323,15 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
     const totalSteps = exam.questions.length + exam.speakingPrompts.length;
     const pctBar = Math.round((totalDoneSteps / totalSteps) * 100);
 
+    const totalExamPts = exam.questions.length + exam.speakingPrompts.length * 2;
+    const earnedSoFar = quizCorrect + speakResults.reduce((s, r) => s + (r ? r.points : 0), 0);
+    const liveHudHtml = renderLiveScoreHud({
+      earned: earnedSoFar,
+      total: totalExamPts,
+      passPct: DAILY_MASTERY_PASS_PCT,
+      label: `คะแนนสอบ Day ${dayNum}`
+    });
+
     if (q.kind === 'order') {
       const builtText = selectedOrderIndices.map(i => q.tiles[i]).join('');
       host.innerHTML = `
@@ -330,11 +340,12 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
             <div>
               <span class="m1-tag">🎯 สอบวัดผล Day ${dayNum} · พาร์ท 1 ข้อ ${qIdx + 1}/${exam.questions.length} · ${core.escapeHtml(q.category)}</span>
               <h3 style="margin:6px 0 2px">${core.escapeHtml(q.prompt)}</h3>
-              <p class="m1-muted" style="margin:0;font-size:12.5px">เกณฑ์ผ่านประจำวัน ≥ ${DAILY_MASTERY_PASS_PCT}% (19/20 คะแนน) · แตะแผ่นคำด้านล่างเพื่อเรียงเป็นประโยค</p>
+              <p class="m1-muted" style="margin:0;font-size:12.5px">เกณฑ์ผ่านประจำวัน ≥ ${DAILY_MASTERY_PASS_PCT}% · แตะแผ่นคำด้านล่างเพื่อเรียงเป็นประโยค</p>
             </div>
             <button type="button" class="btn-secondary m1-mini-btn" id="m1-exam-exit">ออก</button>
           </div>
           <div class="m1-prog"><div class="m1-prog-fill" style="width:${Math.max(6, pctBar)}%"></div></div>
+          ${liveHudHtml}
 
           <div class="m1-order-answer" id="m1-order-slot">
             ${selectedOrderIndices.length
@@ -342,7 +353,7 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
                 const tPy = q.tilePinyins?.[tileIdx] || '';
                 return `<button type="button" class="m1-order-chip chosen" data-unpick="${pos}">
                   <span class="hanzi-font">${core.escapeHtml(q.tiles[tileIdx])}</span>
-                  ${tPy ? `<small class="m1-tile-py">${core.escapeHtml(tPy)}</small>` : ''}
+                  ${tPy ? `<small class="m1-tile-py">${colorizePinyin(tPy)}</small>` : ''}
                 </button>`;
               }).join('')
               : '<span class="m1-muted" style="font-size:14px">แตะคำด้านล่างมาวางเรียงตรงนี้...</span>'}
@@ -354,12 +365,12 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
               const tPy = q.tilePinyins?.[idx] || '';
               return `<button type="button" class="m1-order-chip" data-pick-tile="${idx}" ${used ? 'disabled' : ''}>
                 <span class="hanzi-font">${core.escapeHtml(t)}</span>
-                ${tPy ? `<small class="m1-tile-py">${core.escapeHtml(tPy)}</small>` : ''}
+                ${tPy ? `<small class="m1-tile-py">${colorizePinyin(tPy)}</small>` : ''}
               </button>`;
             }).join('')}
           </div>
 
-          <div class="m1-runner-foot" style="justify-content:space-between;gap:8px">
+          <div class="ux-sticky-bar">
             <button type="button" class="btn-secondary" id="m1-order-clear" ${selectedOrderIndices.length ? '' : 'disabled'}>ล้างเรียงใหม่</button>
             <button type="button" class="btn-primary" id="m1-order-submit" ${selectedOrderIndices.length === q.tiles.length ? '' : 'disabled'}>ส่งคำตอบข้อนี้ →</button>
           </div>
@@ -424,6 +435,7 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
           <button type="button" class="btn-secondary m1-mini-btn" id="m1-exam-exit">ออก</button>
         </div>
         <div class="m1-prog"><div class="m1-prog-fill" style="width:${Math.max(6, pctBar)}%"></div></div>
+        ${liveHudHtml}
 
         ${q.audioHz ? `
           <div style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
@@ -488,6 +500,15 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
     const totalSteps = exam.questions.length + exam.speakingPrompts.length;
     const pctBar = Math.round(((exam.questions.length + sIdx) / totalSteps) * 100);
 
+    const totalExamPts = exam.questions.length + exam.speakingPrompts.length * 2;
+    const earnedSoFar = quizCorrect + speakResults.reduce((s, r) => s + (r ? r.points : 0), 0);
+    const liveHudHtml = renderLiveScoreHud({
+      earned: earnedSoFar,
+      total: totalExamPts,
+      passPct: DAILY_MASTERY_PASS_PCT,
+      label: `คะแนนสอบ Day ${dayNum}`
+    });
+
     host.innerHTML = `
       <div class="card-panel m1-runner">
         <div class="m1-runner-head">
@@ -499,11 +520,12 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
           <button type="button" class="btn-secondary m1-mini-btn" id="m1-exam-exit">ออก</button>
         </div>
         <div class="m1-prog"><div class="m1-prog-fill" style="width:${pctBar}%"></div></div>
+        ${liveHudHtml}
 
         <div class="m1-speak-exam-box">
           <div class="m1-muted" style="font-size:13px;margin-bottom:4px">ความหมาย: "${core.escapeHtml(sp.th)}"</div>
           <div class="hanzi-font" style="font-size:32px;font-weight:700;letter-spacing:2px;margin-bottom:4px">${core.escapeHtml(sp.hz)}</div>
-          <div class="m1-py" style="font-size:18px;margin-bottom:14px">${core.escapeHtml(sp.py)}</div>
+          <div class="m1-py" style="font-size:18px;margin-bottom:14px">${colorizePinyin(sp.py)}</div>
 
           <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
             <button type="button" class="btn-secondary" id="m1-exam-model-once" ${modelPlayed || micListening ? 'disabled' : ''}>
@@ -512,12 +534,13 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
           </div>
 
           ${srSupported ? `
-            <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap">
               <button type="button" class="btn-primary m1-mic-exam-btn ${micListening ? 'is-listening' : ''}" id="m1-exam-mic" ${tries >= maxTries && !micListening ? 'disabled' : ''}>
                 ${micListening
                   ? '🔴 กำลังฟังเสียงภาษาจีน... พูดเลย! (แตะเพื่อหยุด)'
                   : `🎙️ กดพูดออกไมค์ (${tries}/${maxTries} ครั้ง)`}
               </button>
+              ${renderMicWaveHtml(micListening)}
             </div>
           ` : `
             <div class="m1-fallback-dictation">

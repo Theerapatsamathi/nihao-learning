@@ -118,6 +118,47 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
       </div>${bossCardAfter}`;
   };
 
+  const renderWeeklyJourney = (daysList, mode) => {
+    const weeksMap = new Map();
+    for (const d of daysList) {
+      const w = Number(d.week) || Math.ceil(d.day / 7);
+      if (!weeksMap.has(w)) weeksMap.set(w, []);
+      weeksMap.get(w).push(d);
+    }
+    return [...weeksMap.entries()].map(([wNum, wDays]) => {
+      const doneCnt = wDays.filter(d => isDayMastered(d.day, core.state.progress, ext)).length;
+      const containsToday = wDays.some(d => d.day === todayDay);
+      const allDone = doneCnt === wDays.length;
+      const bossDay = wDays.find(d => WEEKLY_BOSS_DAYS.includes(d.day))?.day || null;
+      const bossOk = bossDay ? isWeeklyBossPassed(bossDay, ext) : false;
+      const dotsHtml = wDays.map(d => {
+        const m = isDayMastered(d.day, core.state.progress, ext);
+        const dec = decayedSet.has(d.day);
+        const rec = getDayMasteryRecord(d.day, ext);
+        const cls = d.day === todayDay ? 'is-cur' : (m && dec ? 'is-decay' : (m ? 'is-pass' : (rec.attempts > 0 ? 'is-fail' : '')));
+        return `<span class="ux-dot ${cls}" title="Day ${d.day}"></span>`;
+      }).join('') + (bossDay ? `<span class="ux-dot is-boss ${bossOk ? 'is-pass' : ''}" title="Boss W${wNum}"></span>` : '');
+
+      return `
+        <details class="ux-week-group ${containsToday ? 'is-current' : ''}" ${containsToday || !allDone ? 'open' : ''} ${containsToday ? 'data-current-week="1"' : ''}>
+          <summary class="ux-week-summary">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <strong>📅 สัปดาห์ที่ ${wNum} (Day ${wDays[0].day}–${wDays[wDays.length - 1].day})</strong>
+              <span class="m1-status-pill ${allDone ? 'pass' : (containsToday ? 'pending' : '')}">${doneCnt}/${wDays.length} วัน</span>
+              ${bossDay ? `<span class="m1-tag">${bossOk ? '✅' : '🐉'} Boss W${wNum}</span>` : ''}
+            </div>
+            <div class="ux-dot-strip">${dotsHtml}</div>
+          </summary>
+          <div class="ux-week-body">
+            <div class="m1-days-grid">
+              ${wDays.map(d => renderDayCard(d, mode)).join('')}
+            </div>
+          </div>
+        </details>
+      `;
+    }).join('');
+  };
+
   body.innerHTML = `
     <div class="card-panel m1-hero">
       <div class="m1-hero-left">
@@ -156,32 +197,24 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
             <h3 style="margin:0">📅 สัปดาห์ 1–2 (Day 1–14): พินอิน วรรณยุกต์ & รากฐานการออกเสียง</h3>
             <button type="button" class="btn-secondary" id="m1-go-plan14">เปิดตารางเรียนละเอียด 60 นาที →</button>
           </div>
-          <div class="m1-days-grid">
-            ${plan14.map(d => renderDayCard(d, 'plan14')).join('')}
-          </div>
+          ${renderWeeklyJourney(plan14, 'plan14')}
         </div>
       ` : ''}
       <div class="card-panel" style="margin-top:16px">
         <h3 style="margin:0 0 12px">📅 สัปดาห์ 3–4 (Day 15–30): สนทนาเอาตัวรอด แต่งประโยค & สอบจบ HSK 1</h3>
-        <div class="m1-days-grid">
-          ${MONTH1_DAYS_15_30.map(d => renderDayCard(d, 'm1_15_30')).join('')}
-        </div>
+        ${renderWeeklyJourney(MONTH1_DAYS_15_30, 'm1_15_30')}
       </div>
     ` : curMonth === 2 ? `
       <div class="card-panel" style="margin-top:12px">
         <h3 style="margin:0 0 6px">🚀 เดือนที่ 2 (Day 31–60 · HSK 2 · 300 คำ)</h3>
         <p class="m1-muted" style="margin:0 0 14px;font-size:13px">เชื่อมประโยคเหตุผล-ขัดแย้ง (因为…所以, 虽然…但是), เปรียบเทียบ 比, กำลังทำ 正在, ประสบการณ์ 过, หาหมอ, จองโรงแรม และสั่งเดลิเวอรี</p>
-        <div class="m1-days-grid">
-          ${MONTH2_DAYS_31_60.map(d => renderDayCard(d, 'adv')).join('')}
-        </div>
+        ${renderWeeklyJourney(MONTH2_DAYS_31_60, 'adv')}
       </div>
     ` : `
       <div class="card-panel" style="margin-top:12px">
         <h3 style="margin:0 0 6px">👑 เดือนที่ 3 (Day 61–90 · HSK 3 · 600 คำ)</h3>
         <p class="m1-muted" style="margin:0 0 14px;font-size:13px">ปราบไวยากรณ์ระดับกลาง (ประโยค 把, ถูกกระทำ 被, ทิศทางซ้อน, คู่สับสน 或者/还是 · 刚才/刚刚 · 只要/只有) พร้อมภาษาทำงานและสอบจบ 90 วัน!</p>
-        <div class="m1-days-grid">
-          ${MONTH3_DAYS_61_90.map(d => renderDayCard(d, 'adv')).join('')}
-        </div>
+        ${renderWeeklyJourney(MONTH3_DAYS_61_90, 'adv')}
       </div>
     `}
   `;

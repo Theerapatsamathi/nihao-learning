@@ -404,3 +404,268 @@
   opacity: 0.85;
   line-height: 1.1;
 }
+
+
+/* ==========================================================================
+   UX/UI Upgrade Suite: Tone Colors, Mobile Bottom Nav, Sticky Bar, Mic Wave,
+   Live 95% HUD, Focus-First Dashboard & Weekly Visual Journey
+   ========================================================================== */
+
+/* 1. Tone-Colored Pinyin (enabled when html.ux-tone-colors is present) */
+.ux-tone-colors .ux-tone-1 { color: #dc2626 !important; font-weight: 700; }
+.ux-tone-colors .ux-tone-2 { color: #16a34a !important; font-weight: 700; }
+.ux-tone-colors .ux-tone-3 { color: #7c3aed !important; font-weight: 700; }
+.ux-tone-colors .ux-tone-4 { color: #2563eb !important; font-weight: 700; }
+.ux-tone-colors .ux-tone-0 { color: var(--sys-label-2, #6b7280) !important; }
+
+.theme-dark.ux-tone-colors .ux-tone-1,
+.ux-tone-colors .theme-dark .ux-tone-1 { color: #f87171 !important; }
+.theme-dark.ux-tone-colors .ux-tone-2,
+.ux-tone-colors .theme-dark .ux-tone-2 { color: #4ade80 !important; }
+.theme-dark.ux-tone-colors .ux-tone-3,
+.ux-tone-colors .theme-dark .ux-tone-3 { color: #c084fc !important; }
+.theme-dark.ux-tone-colors .ux-tone-4,
+.ux-tone-colors .theme-dark .ux-tone-4 { color: #60a5fa !important; }
+
+/* Reading Comfort: Large Hanzi mode */
+.ux-large-hanzi .hanzi-font {
+  font-size: 1.18em;
+  letter-spacing: 0.03em;
+}
+.ux-tone-btn.is-on {
+  background: rgba(0, 122, 255, 0.14);
+  border-color: rgba(0, 122, 255, 0.35);
+}
+
+/* 2. Mobile Bottom Navigation Bar (Thumb-Zone) */
+.ux-bottom-nav {
+  display: none;
+}
+@media (max-width: 860px) {
+  .ux-bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 950;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-top: 1px solid var(--sys-sep, rgba(0, 0, 0, 0.1));
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
+  }
+  .theme-dark .ux-bottom-nav {
+    background: rgba(24, 24, 28, 0.92);
+    border-top-color: rgba(255, 255, 255, 0.1);
+  }
+  .ux-bnav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 2px;
+    border: none;
+    background: transparent;
+    color: var(--sys-label-2, #666);
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .ux-bnav-btn.active {
+    color: var(--sys-accent, #007aff);
+    background: rgba(0, 122, 255, 0.1);
+  }
+  .ux-bnav-ico { font-size: 18px; line-height: 1.1; }
+  .ux-bnav-lbl { font-size: 10.5px; white-space: nowrap; }
+  .main-content, .content-wrap {
+    padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* 3. Sticky Bottom Action Bar for Guided Session & Exam */
+.ux-sticky-bar {
+  position: sticky;
+  bottom: 8px;
+  z-index: 40;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--sys-sep, rgba(0, 0, 0, 0.12));
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.theme-dark .ux-sticky-bar {
+  background: rgba(28, 28, 32, 0.94);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+@media (max-width: 860px) {
+  .ux-sticky-bar {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* 4. Live 95% Progress & Score HUD */
+.ux-live-hud {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sys-fill-3, rgba(120, 120, 128, 0.1));
+  margin-bottom: 12px;
+  border: 1px solid transparent;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.ux-live-hud.is-pass {
+  background: rgba(52, 199, 89, 0.12);
+  border-color: rgba(52, 199, 89, 0.45);
+}
+.ux-live-hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+.ux-live-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.2);
+  overflow: visible;
+}
+.ux-live-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--sys-accent, #007aff);
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.ux-live-hud.is-pass .ux-live-fill {
+  background: #16a34a;
+}
+.ux-live-marker {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: #f59e0b;
+  border-radius: 2px;
+}
+
+/* 5. Mic Pulse / Waveform Animation */
+.ux-mic-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.ux-mic-wave span {
+  display: inline-block;
+  width: 4px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ef4444;
+  animation: uxWaveBounce 0.9s ease-in-out infinite;
+}
+.ux-mic-wave span:nth-child(2) { animation-delay: 0.15s; }
+.ux-mic-wave span:nth-child(3) { animation-delay: 0.3s; }
+.ux-mic-wave span:nth-child(4) { animation-delay: 0.45s; }
+.ux-mic-wave span:nth-child(5) { animation-delay: 0.6s; }
+@keyframes uxWaveBounce {
+  0%, 100% { height: 6px; opacity: 0.55; }
+  50% { height: 22px; opacity: 1; }
+}
+
+/* 6. Focus-First Today Dashboard Tabs & Primary CTA */
+.ux-focus-hero {
+  border-width: 1.5px !important;
+}
+.ux-primary-cta {
+  padding: 12px 20px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 6px 18px rgba(0, 122, 255, 0.25);
+}
+.ux-hub-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  margin-bottom: 10px;
+}
+
+/* 7. Weekly Visual Journey Accordion & Status Dots */
+.ux-week-group {
+  border: 1px solid var(--sys-sep, rgba(0, 0, 0, 0.1));
+  border-radius: 14px;
+  background: var(--sys-bg-elevated, #fff);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.theme-dark .ux-week-group {
+  background: var(--sys-bg-elevated, #1c1c1e);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.ux-week-group.is-current {
+  border-color: var(--sys-accent, #007aff);
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.12);
+}
+.ux-week-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  user-select: none;
+}
+.ux-week-summary::-webkit-details-marker { display: none; }
+.ux-week-body {
+  padding: 0 14px 14px;
+  border-top: 1px dashed var(--sys-sep, rgba(0, 0, 0, 0.1));
+  padding-top: 12px;
+}
+.ux-dot-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ux-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(120, 120, 128, 0.25);
+  display: inline-block;
+}
+.ux-dot.is-pass { background: #16a34a; }
+.ux-dot.is-decay { background: #f59e0b; }
+.ux-dot.is-fail { background: #ef4444; }
+.ux-dot.is-cur {
+  background: var(--sys-accent, #007aff);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.25);
+}
+.ux-dot.is-boss {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #7c3aed;
+}
+.ux-dot.is-boss.is-pass { background: #16a34a; }

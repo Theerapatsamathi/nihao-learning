@@ -5,6 +5,7 @@ import { applyBeginnerMode, renderGuidedRunner, renderExamOnlyRunner } from './g
 import { renderMonth1Tab } from './views.js';
 import { renderCopybookTab } from './copybook.js';
 import { renderTodayDashboard } from './today-dashboard.js';
+import { initUxEnhancements } from './ux-utils.js';
 
 const core = window.NihaoCore;
 
@@ -92,6 +93,7 @@ if (core) {
       core.switchTab('today');
     }
     applyBeginnerMode(core);
+    initUxEnhancements(core);
   });
   core.on('cloud-synced', () => ensureMasteryInitialized());
   setTimeout(() => applyBeginnerMode(core), 200);

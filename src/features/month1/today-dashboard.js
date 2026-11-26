@@ -1,8 +1,4 @@
-// Unified Today Dashboard (`today` tab) — Complete Mastery Loop Hub:
-// 1. Morning Quiz-FSRS Gate + 4-Step Daily Lesson + Mandatory >=95% Mastery Exam
-// 2. Weekly Cumulative Boss Exam (Day 7/14/21/30 >=95%) & 7/21-Day Memory Decay Re-Verify
-// 3. 4-Second Reflex Speaking Trainer & Endless Adaptive Weakness Grinder
-// 4. AI Copybook Grader, Smart Lyrics Importer, Snap Camera & 1v1 Arena
+// Unified Today Dashboard (`today` tab) — Focus-First Single Primary Action + Clean Segmented Hub
 
 import {
   DAILY_MASTERY_PASS_PCT,
@@ -32,6 +28,9 @@ import {
 } from './realworld-drills.js';
 import { realWorldProgress } from './realworld-logic.js';
 import { openQuickDict } from './quick-dict.js';
+import { isLargeHanziEnabled, setLargeHanziEnabled } from './ux-utils.js';
+
+let activeHubSection = 'practice'; // 'practice' | 'realworld' | 'tools'
 
 export function renderTodayDashboard(core, host) {
   if (!host) return;
@@ -48,64 +47,93 @@ export function renderTodayDashboard(core, host) {
   const dueVocabSrs = typeof core.getDueVocabSrsCount === 'function' ? core.getDueVocabSrsCount() : 0;
   const totalDueCards = dueM1Fsrs.length + dueVocabSrs;
   const beginnerOn = Boolean(ext.beginnerMode);
+  const largeHanziOn = isLargeHanziEnabled();
   const rwp = realWorldProgress(ext.realWorld);
 
+  // Single Primary Action priority:
+  // 1) Pending Weekly Boss -> 2) Morning FSRS Gate -> 3) Memory Decay Check -> 4) Today's Daily Lesson & >=95% Exam
+  let heroActionType = 'lesson';
   let statusBadgeHtml = `<span class="m1-status-pill pending">🎯 เกณฑ์ผ่านประจำวัน ≥ ${DAILY_MASTERY_PASS_PCT}%</span>`;
-  let primaryBtnLabel = dueM1Fsrs.length > 0 && !dayRec.passed
-    ? `🔒 ทวน FSRS (${dueM1Fsrs.length} คำ) → เริ่มเรียน Day ${todayDay}`
-    : `▶ เริ่มเรียน & สอบ Day ${todayDay} (เกณฑ์ผ่าน ${DAILY_MASTERY_PASS_PCT}%)`;
+  let heroTitle = `เป้าหมายวันนี้: พิชิต Day ${todayDay} / 90 (${todayDay <= 30 ? 'HSK 1' : (todayDay <= 60 ? 'HSK 2' : 'HSK 3')})`;
+  let heroSub = `เรียนฝึกครบ 3 ขั้น → สอบรายวัน ≥ ${DAILY_MASTERY_PASS_PCT}% เพื่อปลดล็อกวันถัดไป`;
+  let primaryBtnLabel = `▶ เริ่มเรียน & สอบ Day ${todayDay}`;
 
   if (pendingBoss) {
-    statusBadgeHtml = `<span class="m1-status-pill fail">🐉 ติดด่านบอสสะสม สัปดาห์ที่ ${Math.ceil(pendingBoss / 7)} (Day 1–${pendingBoss}) · ต้องสอบผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}% ก่อนขึ้นสัปดาห์ใหม่!</span>`;
-    primaryBtnLabel = `🐉 เข้าสอบบอสสะสม Day 1–${pendingBoss} (เกณฑ์ ≥ ${DAILY_MASTERY_PASS_PCT}%)`;
+    heroActionType = 'boss';
+    const wNum = Math.ceil(pendingBoss / 7);
+    statusBadgeHtml = `<span class="m1-status-pill fail">🐉 ด่านบอสสะสม W${wNum} (ต้องผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}%)</span>`;
+    heroTitle = `ถึงคิวสอบใหญ่! พิชิตบอสสะสม สัปดาห์ที่ ${wNum} (Day 1–${pendingBoss})`;
+    heroSub = `ต้องสอบผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}% ก่อนปลดล็อกสัปดาห์ถัดไป หากไม่ผ่านระบบจะชี้เป้าวันที่ต้องซ่อม`;
+    primaryBtnLabel = `🐉 เข้าสอบบอสสะสม W${wNum} ตอนนี้`;
+  } else if (dueM1Fsrs.length > 0 && !dayRec.passed) {
+    heroActionType = 'fsrs';
+    statusBadgeHtml = `<span class="m1-status-pill pending">🧠 Morning Gate · รอทวน ${dueM1Fsrs.length} คำ</span>`;
+    heroTitle = `ทวนศัพท์ FSRS ${dueM1Fsrs.length} คำก่อนเริ่ม Day ${todayDay}`;
+    heroSub = `เคลียร์การ์ดความจำที่ถึงกำหนดวันนี้ให้ครบก่อน เพื่อล็อกความจำระยะยาวแล้วลุยบทใหม่`;
+    primaryBtnLabel = `🧠 เริ่มทวน FSRS (${dueM1Fsrs.length} คำ) →`;
+  } else if (decayedDays.length > 0) {
+    heroActionType = 'decay';
+    const firstDecay = decayedDays[0];
+    statusBadgeHtml = `<span class="m1-status-pill pending">🔔 เช็กความจำ 7/21 วัน (${decayedDays.length} วัน)</span>`;
+    heroTitle = `เช็กความจำด่วน 5 ข้อ: Day ${firstDecay.day}`;
+    heroSub = `ผ่านมานานแล้ว มาทดสอบสั้นๆ 5 ข้อเพื่อยืนยันว่ายังจำได้ ≥ ${DAILY_MASTERY_PASS_PCT}%`;
+    primaryBtnLabel = `🔔 ทำควิซเช็กความจำ Day ${firstDecay.day} (5 ข้อ)`;
   } else if (dayRec.passed) {
-    statusBadgeHtml = `<span class="m1-status-pill pass">✅ สอบผ่านครบทุกวันแล้ว! (Day ${todayDay} สถิติ ${dayRec.bestPct}%)</span>`;
+    statusBadgeHtml = `<span class="m1-status-pill pass">✅ สอบผ่าน Day ${todayDay} แล้ว (${dayRec.bestPct}%)</span>`;
+    heroTitle = `เยี่ยมมาก! คุณสอบผ่าน Day ${todayDay} ครบเกณฑ์แล้ว`;
+    heroSub = `สามารถทบทวนซ้ำ หรือเลือกฝึกโหมดพูดไว/สถานการณ์จริงด้านล่างได้เลย`;
     primaryBtnLabel = `🔄 ทบทวน & สอบซ้ำ Day ${todayDay}`;
   } else if (dayRec.attempts > 0) {
-    statusBadgeHtml = `<span class="m1-status-pill fail">⏳ ยังไม่จบ Day ${todayDay} · ล่าสุด ${dayRec.lastPct}% (สูงสุด ${dayRec.bestPct}% / ต้องถึง ${DAILY_MASTERY_PASS_PCT}%)</span>`;
-    primaryBtnLabel = `📖 เรียนทบทวนใหม่ & สอบแก้ตัว Day ${todayDay} (ครั้งที่ ${dayRec.attempts + 1})`;
+    statusBadgeHtml = `<span class="m1-status-pill fail">⏳ ล่าสุด ${dayRec.lastPct}% (ต้องถึง ${DAILY_MASTERY_PASS_PCT}%)</span>`;
+    heroTitle = `ซ่อมจุดพลาด & สอบแก้ตัว Day ${todayDay}`;
+    heroSub = `สูงสุด ${dayRec.bestPct}% — ระบบเก็บคำที่ผิดไว้ให้ทบทวนแล้ว สอบรอบนี้ให้ผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}%!`;
+    primaryBtnLabel = `📖 เรียนทบทวน & สอบแก้ตัว Day ${todayDay}`;
   }
 
   host.innerHTML = `
-    <div class="card-panel m1-hero" style="background:linear-gradient(135deg, rgba(0,122,255,0.10), rgba(124,58,237,0.08));border-color:rgba(0,122,255,0.25)">
+    <!-- Focus-First Single Primary Action Hero -->
+    <div class="card-panel m1-hero ux-focus-hero" style="background:linear-gradient(135deg, rgba(0,122,255,0.10), rgba(124,58,237,0.08));border-color:rgba(0,122,255,0.28)">
       <div class="m1-hero-left">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <div class="m1-tag">🏠 ศูนย์รวมการเรียนวันนี้ · LV.${g.level} (${core.escapeHtml(g.rank?.th || 'ผู้เรียน')})</div>
+          <div class="m1-tag">🏠 วันนี้ · LV.${g.level} (${core.escapeHtml(g.rank?.th || 'ผู้เรียน')})</div>
           ${statusBadgeHtml}
         </div>
-        <h2 style="margin:8px 0 6px">
-          ${pendingBoss
-            ? `ด่านสำคัญ! พิชิตสอบใหญ่บอสสะสม Day 1–${pendingBoss} ให้ถึง ${DAILY_MASTERY_PASS_PCT}%`
-            : `สวัสดี! เป้าหมายวันนี้: พิชิต Day ${todayDay} / 90 (${todayDay <= 30 ? 'HSK 1' : (todayDay <= 60 ? 'HSK 2' : 'HSK 3')}) ให้ผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}%`}
-        </h2>
-        <p class="m1-muted" style="margin:0 0 14px">ระบบล็อกคุณภาพครบวงจร: <b>เคลียร์การ์ด FSRS ก่อนเรียน → เรียนฝึกครบ 3 ขั้น → สอบรายวัน ≥ ${DAILY_MASTERY_PASS_PCT}% → สอบบอสสะสมทุก 7 วัน ≥ ${DAILY_MASTERY_PASS_PCT}%</b></p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button type="button" class="btn-primary" id="td-start-15m">${core.escapeHtml(primaryBtnLabel)}</button>
-          <button type="button" class="btn-secondary" id="td-open-dict">🔍 ค้นศัพท์ / วาดตัวจีน (/)</button>
+        <h2 style="margin:10px 0 6px">${core.escapeHtml(heroTitle)}</h2>
+        <p class="m1-muted" style="margin:0 0 14px">${core.escapeHtml(heroSub)}</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="btn-primary ux-primary-cta" id="td-start-15m">${core.escapeHtml(primaryBtnLabel)}</button>
+          <button type="button" class="btn-secondary" id="td-open-dict">🔍 ค้นศัพท์ (/)</button>
+          <button type="button" class="btn-secondary" id="td-go-month1">🗺️ แผน 90 วัน</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
           <label class="m1-toggle-chip">
             <input type="checkbox" id="td-beginner-chk" ${beginnerOn ? 'checked' : ''}>
             <span>โหมดโฟกัสมือใหม่</span>
+          </label>
+          <label class="m1-toggle-chip">
+            <input type="checkbox" id="td-large-hanzi-chk" ${largeHanziOn ? 'checked' : ''}>
+            <span>ตัวจีนใหญ่พิเศษ</span>
           </label>
         </div>
       </div>
       <div class="m1-kpi-mini">
         <div><strong>🔥 ${g.streak || 0}</strong><span>Streak</span></div>
-        <div><strong>${stats90.total90Done}/90</strong><span>วันผ่าน ≥95%</span></div>
-        <div><strong>${totalDueCards}</strong><span>การ์ดรอทวน</span></div>
+        <div><strong>${stats90.total90Done}/90</strong><span>ผ่าน ≥95%</span></div>
+        <div><strong>${totalDueCards}</strong><span>รอทวน</span></div>
       </div>
     </div>
 
-    ${decayedDays.length > 0 ? `
-      <div class="card-panel" style="margin-top:14px;border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.08)">
+    ${decayedDays.length > 0 && heroActionType !== 'decay' ? `
+      <div class="card-panel" style="margin-top:12px;border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.08)">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <div>
-            <strong>🔔 แจ้งเตือนเช็กความจำเสื่อมตามเวลา (Memory Decay Check · ${decayedDays.length} วัน)</strong>
-            <div class="m1-muted" style="font-size:12.5px">วันที่สอบผ่านไปแล้วครบ 7 หรือ 21 วัน กดทำควิซด่วน 5 ข้อเพื่อยืนยันว่ายังจำได้ ≥ ${DAILY_MASTERY_PASS_PCT}%!</div>
+            <strong>🔔 เช็กความจำเสื่อมตามเวลา (${decayedDays.length} วัน)</strong>
+            <div class="m1-muted" style="font-size:12.5px">ทำควิซด่วน 5 ข้อเพื่อยืนยันว่ายังจำได้ ≥ ${DAILY_MASTERY_PASS_PCT}%</div>
           </div>
           <div class="m1-chip-row">
             ${decayedDays.map(dd => `
               <button type="button" class="btn-primary m1-mini-btn" data-decay-day="${dd.day}" title="${core.escapeHtml(dd.reason)}">
-                🔔 สอบเช็กซ้ำ Day ${dd.day} (5 ข้อ)
+                🔔 Day ${dd.day} (5 ข้อ)
               </button>
             `).join('')}
           </div>
@@ -113,148 +141,138 @@ export function renderTodayDashboard(core, host) {
       </div>
     ` : ''}
 
-    <!-- Intensive Review · Practice · Boss Exam Bar -->
-    <div class="card-panel" style="margin-top:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-        <div>
-          <h3 style="margin:0">🔥 โหมดฝึกพิเศษ: ทวนให้แม่น · พูดให้ไว · สอบสะสม</h3>
-          <div class="m1-muted" style="font-size:12.5px">ฝึกซ้ำได้ไม่จำกัดรอบเพื่อให้คล่องปากและจำฝังใจระยะยาว</div>
-        </div>
-      </div>
-      <div class="m1-days-grid" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))">
-        <div class="m1-day-card">
-          <span class="m1-tag">⚡ Reflex 4s</span>
-          <div style="font-weight:700;margin:6px 0 4px">พูดสวนกลับไวใน 4 วินาที</div>
-          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ฝึกสมองสั่งปากพูดภาษาจีนทันทีก่อนหมดเวลา แก้อาการคิดช้าอ้ำอึ้งเวลาเจอคนจีนจริง</div>
-          <button type="button" class="btn-primary m1-mini-btn" id="td-go-reflex">⚡ เริ่มซ้อมพูดไว 4 วิ →</button>
-        </div>
-
-        <div class="m1-day-card">
-          <span class="m1-tag">💪 Endless Drill</span>
-          <div style="font-weight:700;margin:6px 0 4px">สนามซ้อมขยี้จุดอ่อน 4 ท่า</div>
-          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ดึงคำที่เคยผิดมาวนยำ 4 รูปแบบ: ฟังเร็ว · พิมพ์พินอิน · พูดไมค์ · แปลไว ซ้อมได้ไม่จำกัดยก</div>
-          <button type="button" class="btn-primary m1-mini-btn" id="td-go-weakness">💪 ลุยขยี้จุดอ่อน →</button>
-        </div>
-
-        <div class="m1-day-card">
-          <span class="m1-tag">🐉 Weekly Boss ≥95%</span>
-          <div style="font-weight:700;margin:6px 0 4px">สอบใหญ่บอสสะสมทุก 7 วัน</div>
-          <div class="m1-muted" style="font-size:12px;margin-bottom:8px">ยำรวมข้อสอบทุกวันตั้งแต่ Day 1 พร้อมชี้เป้าวันที่ลืมหากได้ไม่ถึง 95%</div>
-          <div class="m1-chip-row">
-            ${WEEKLY_BOSS_DAYS.map(cp => {
-              const ok = isWeeklyBossPassed(cp, ext);
-              const unlocked = todayDay >= cp || ok || pendingBoss === cp;
-              return `<button type="button" class="m1-chip ${ok ? 'active' : ''}" data-boss-cp="${cp}" ${unlocked ? '' : 'disabled title="สอบผ่านให้ถึง Day ' + cp + ' ก่อน"'}>${ok ? '✅' : '🐉'} W${Math.ceil(cp / 7)} (D1–${cp})</button>`;
-            }).join('')}
-          </div>
-        </div>
-
-        <div class="m1-day-card">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span class="m1-tag">🧠 Quiz-FSRS</span>
-            <strong>${totalDueCards > 0 ? `${totalDueCards} รอทวน` : 'เคลียร์ครบ ✨'}</strong>
-          </div>
-          <div style="font-weight:700;margin:6px 0 4px">ทวนคำสะสมแบบสอบจริงก่อนเฉลย</div>
-          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">คำจากบทเรียนที่สอบผ่านจะถูกป้อนเข้า FSRS อัตโนมัติ วัดความไวตอบจริง</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${dueM1Fsrs.length > 0 ? `<button type="button" class="btn-primary m1-mini-btn" id="td-go-m1fsrs">🧠 ทวนบทเรียน (${dueM1Fsrs.length})</button>` : ''}
-            <button type="button" class="btn-secondary m1-mini-btn" id="td-go-srs">🔄 คลัง FSRS (${dueVocabSrs})</button>
-            <button type="button" class="btn-secondary m1-mini-btn" id="td-go-bedtime">🌙 ก่อนนอน 3 นาที</button>
-          </div>
-        </div>
-      </div>
+    <!-- Clean Segmented Hub Switcher (reduces visual clutter) -->
+    <div class="ux-hub-tabs" role="tablist">
+      <button type="button" class="m1-pill ${activeHubSection === 'practice' ? 'active' : ''}" data-hub-sec="practice">🔥 ฝึกทวน & สอบบอส</button>
+      <button type="button" class="m1-pill ${activeHubSection === 'realworld' ? 'active' : ''}" data-hub-sec="realworld">🌏 ด่านโลกจริง ${rwp.certified ? '🏅' : ''}</button>
+      <button type="button" class="m1-pill ${activeHubSection === 'tools' ? 'active' : ''}" data-hub-sec="tools">✨ เครื่องมือ AI & Arena</button>
     </div>
 
-    <div class="card-panel" style="margin-top:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-        <div>
+    ${activeHubSection === 'practice' ? `
+      <div class="card-panel">
+        <div class="m1-days-grid" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))">
+          <div class="m1-day-card">
+            <span class="m1-tag">⚡ Reflex 4s</span>
+            <div style="font-weight:700;margin:6px 0 4px">พูดสวนกลับไวใน 4 วินาที</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ฝึกสมองสั่งปากพูดภาษาจีนทันทีก่อนหมดเวลา แก้อาการคิดช้าอ้ำอึ้ง</div>
+            <button type="button" class="btn-primary m1-mini-btn" id="td-go-reflex">⚡ เริ่มซ้อมพูดไว 4 วิ →</button>
+          </div>
+
+          <div class="m1-day-card">
+            <span class="m1-tag">💪 Endless Drill</span>
+            <div style="font-weight:700;margin:6px 0 4px">สนามซ้อมขยี้จุดอ่อน 4 ท่า</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ดึงคำที่เคยผิดมาวนยำ: ฟังเร็ว · พิมพ์พินอิน · พูดไมค์ · แปลไว</div>
+            <button type="button" class="btn-primary m1-mini-btn" id="td-go-weakness">💪 ลุยขยี้จุดอ่อน →</button>
+          </div>
+
+          <div class="m1-day-card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span class="m1-tag">🧠 Quiz-FSRS</span>
+              <strong>${totalDueCards > 0 ? `${totalDueCards} รอทวน` : 'เคลียร์ครบ ✨'}</strong>
+            </div>
+            <div style="font-weight:700;margin:6px 0 4px">ทวนคำสะสมแบบสอบจริงก่อนเฉลย</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">คำจากบทเรียนที่สอบผ่านจะถูกป้อนเข้า FSRS อัตโนมัติ</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${dueM1Fsrs.length > 0 ? `<button type="button" class="btn-primary m1-mini-btn" id="td-go-m1fsrs">🧠 ทวนบทเรียน (${dueM1Fsrs.length})</button>` : ''}
+              <button type="button" class="btn-secondary m1-mini-btn" id="td-go-srs">🔄 คลัง FSRS (${dueVocabSrs})</button>
+              <button type="button" class="btn-secondary m1-mini-btn" id="td-go-bedtime">🌙 ก่อนนอน 3 นาที</button>
+            </div>
+          </div>
+
+          <div class="m1-day-card">
+            <span class="m1-tag">🐉 12 Weekly Bosses ≥95%</span>
+            <div style="font-weight:700;margin:6px 0 4px">สอบใหญ่บอสสะสมทุกสัปดาห์</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:8px">ยำรวมข้อสอบสะสมพร้อมชี้เป้าวันที่ลืม</div>
+            <div class="m1-chip-row">
+              ${WEEKLY_BOSS_DAYS.map(cp => {
+                const ok = isWeeklyBossPassed(cp, ext);
+                const unlocked = todayDay >= cp || ok || pendingBoss === cp;
+                return `<button type="button" class="m1-chip ${ok ? 'active' : ''}" data-boss-cp="${cp}" ${unlocked ? '' : 'disabled title="สอบผ่านให้ถึง Day ' + cp + ' ก่อน"'}>${ok ? '✅' : '🐉'} W${Math.ceil(cp / 7)}</button>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    ` : activeHubSection === 'realworld' ? `
+      <div class="card-panel">
+        <div style="margin-bottom:10px">
           <h3 style="margin:0">🌏 ด่านโลกจริง: ใช้ได้นอกตำรา ${rwp.certified ? '<span class="m1-status-pill pass">🏅 Real-World Certified</span>' : ''}</h3>
-          <div class="m1-muted" style="font-size:12.5px">ไม่มีสคริปต์ · ความเร็วคนจีนจริง · พลิกแพลงประโยค · เขียนจากความจำล้วน (ครบทุกด่านรับตรา Certified)</div>
+          <div class="m1-muted" style="font-size:12.5px">ไม่มีสคริปต์ · ความเร็วคนจีนจริง · พลิกแพลงประโยค · เขียนจากความจำล้วน</div>
+        </div>
+        <div class="m1-days-grid" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))">
+          <div class="m1-day-card ${rwp.unscripted ? 'done' : ''}">
+            <span class="m1-tag">🗣️ พูดสดไร้สคริปต์</span>
+            <div style="font-weight:700;margin:6px 0 4px">พูดตามสถานการณ์ ไม่มีตัวจีนให้ดู</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">สั่งชานม ถามราคา ถามทาง — ต้องสื่อใจความครบ ≥ 95%</div>
+            <button type="button" class="btn-primary m1-mini-btn" id="td-rw-unscripted">${rwp.unscripted ? '✅ ' : ''}🗣️ เริ่มพูดสด →</button>
+          </div>
+          <div class="m1-day-card ${rwp.street === 3 ? 'done' : ''}">
+            <span class="m1-tag">🎧 ฟังคนจีนพูดจริง · ${rwp.street}/3 ระดับ</span>
+            <div style="font-weight:700;margin:6px 0 4px">เร็ว 1.2x + เสียงคาเฟ่/รถไฟใต้ดิน</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">3 ระดับความสมจริง ผ่านต้อง ≥ 90% (9/10 ข้อ)</div>
+            <button type="button" class="btn-primary m1-mini-btn" id="td-rw-street">🎧 เลือกระดับฟัง →</button>
+          </div>
+          <div class="m1-day-card ${rwp.patterns >= 3 ? 'done' : ''}">
+            <span class="m1-tag">🧩 พลิกแพลงประโยค · ${rwp.patterns}/${rwp.patternTotal}</span>
+            <div style="font-weight:700;margin:6px 0 4px">โครงสร้างเดียว เปลี่ยนโจทย์รัวๆ 5 ข้อ</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">是/不是 · 有/没有 · 想/要/会 · 在 · 疑问词 · 很/太…了</div>
+            <button type="button" class="btn-primary m1-mini-btn" id="td-rw-pattern">🧩 เข้าโรงฝึก →</button>
+          </div>
+          <div class="m1-day-card ${rwp.blindChars >= 10 ? 'done' : ''}">
+            <span class="m1-tag">✍️ เขียนไร้รอยประ · ${rwp.blindChars} ตัว</span>
+            <div style="font-weight:700;margin:6px 0 4px">เขียนตามคำบอก ไม่มีเส้นร่าง ไม่มีขีดใบ้</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ลากขีดจากความจำ พลาดได้ไม่เกิน 1 ครั้งต่อตัว</div>
+            <button type="button" class="btn-primary m1-mini-btn" id="td-rw-blind">✍️ เริ่มเขียนล้วน →</button>
+          </div>
         </div>
       </div>
-      <div class="m1-days-grid" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))">
-        <div class="m1-day-card ${rwp.unscripted ? 'done' : ''}">
-          <span class="m1-tag">🗣️ พูดสดไร้สคริปต์</span>
-          <div style="font-weight:700;margin:6px 0 4px">พูดตามสถานการณ์ ไม่มีตัวจีนให้ดู</div>
-          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">สั่งชานม ถามราคา ถามทาง — ต้องสื่อใจความครบ ≥ 95%</div>
-          <button type="button" class="btn-primary m1-mini-btn" id="td-rw-unscripted">${rwp.unscripted ? '✅ ' : ''}🗣️ เริ่มพูดสด →</button>
-        </div>
-        <div class="m1-day-card ${rwp.street === 3 ? 'done' : ''}">
-          <span class="m1-tag">🎧 ฟังคนจีนพูดจริง · ${rwp.street}/3 ระดับ</span>
-          <div style="font-weight:700;margin:6px 0 4px">เร็ว 1.2x + เสียงคาเฟ่/รถไฟใต้ดิน</div>
-          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">3 ระดับความสมจริง ผ่านต้อง ≥ 90% (9/10 ข้อ)</div>
-          <button type="button" class="btn-primary m1-mini-btn" id="td-rw-street">🎧 เลือกระดับฟัง →</button>
-        </div>
-        <div class="m1-day-card ${rwp.patterns >= 3 ? 'done' : ''}">
-          <span class="m1-tag">🧩 พลิกแพลงประโยค · ${rwp.patterns}/${rwp.patternTotal} โครงสร้าง</span>
-          <div style="font-weight:700;margin:6px 0 4px">โครงสร้างเดียว เปลี่ยนโจทย์รัวๆ 5 ข้อ</div>
-          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">是/不是 · 有/没有 · 想/要/会 · 在 · 疑问词 · 很/太…了</div>
-          <button type="button" class="btn-primary m1-mini-btn" id="td-rw-pattern">🧩 เข้าโรงฝึก →</button>
-        </div>
-        <div class="m1-day-card ${rwp.blindChars >= 10 ? 'done' : ''}">
-          <span class="m1-tag">✍️ เขียนไร้รอยประ · ${rwp.blindChars} ตัวที่เขียนได้</span>
-          <div style="font-weight:700;margin:6px 0 4px">เขียนตามคำบอก ไม่มีเส้นร่าง ไม่มีขีดใบ้</div>
-          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ลากขีดจากความจำ พลาดได้ไม่เกิน 1 ครั้งต่อตัว</div>
-          <button type="button" class="btn-primary m1-mini-btn" id="td-rw-blind">✍️ เริ่มเขียนล้วน →</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="m1-days-grid" style="margin-top:16px;grid-template-columns:repeat(auto-fit, minmax(250px, 1fr))">
-      <!-- AI Handwriting Grader -->
-      <div class="m1-day-card">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="m1-tag">✨ Gemini Vision</span>
-          <span>📝 สมุด 米字格</span>
-        </div>
-        <div style="font-weight:700;font-size:16px;margin:8px 0 4px">สมุดคัดลายมือ + ครู AI ตรวจสัดส่วน</div>
-        <div class="m1-muted" style="font-size:12.5px;margin-bottom:12px">คัดตัวจีนด้วย Apple Pencil / นิ้ว / เมาส์ แล้วกดส่งครู AI ให้เกรด S/A/B/C รายตัวทันที</div>
-        <button type="button" class="btn-primary m1-mini-btn m1-ai-btn" id="td-go-copybook">✍️ เปิดสมุดคัดลายมือ →</button>
-      </div>
-
-      <!-- Smart Lyrics & Snap Camera -->
-      <div class="m1-day-card">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="m1-tag">🎵 C-Pop & Camera</span>
-          <span>NEW</span>
-        </div>
-        <div style="font-weight:700;font-size:16px;margin:8px 0 4px">แกะเพลงจีน & ถ่ายรูปแปลเมนูอาหาร</div>
-        <div class="m1-muted" style="font-size:12.5px;margin-bottom:12px">วางเนื้อเพลงจีนแตะแปลทุกคำ หรือถ่ายรูปเมนูร้านจีนให้ AI สอนประโยคสั่งอาหารจริง</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button type="button" class="btn-primary m1-mini-btn" id="td-go-lyrics">🎵 แกะเพลง/ซับ</button>
-          <button type="button" class="btn-secondary m1-mini-btn" id="td-go-snap">📸 ถ่ายรูปเมนู</button>
+    ` : `
+      <div class="card-panel">
+        <div class="m1-days-grid" style="grid-template-columns:repeat(auto-fit, minmax(230px, 1fr))">
+          <div class="m1-day-card">
+            <span class="m1-tag">✨ Gemini Vision</span>
+            <div style="font-weight:700;margin:6px 0 4px">สมุดคัดลายมือ + ครู AI ตรวจสัดส่วน</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">คัดตัวจีนด้วยนิ้ว/ปากกา/เมาส์ ส่งครู AI ให้เกรด S/A/B/C</div>
+            <button type="button" class="btn-primary m1-mini-btn m1-ai-btn" id="td-go-copybook">✍️ เปิดสมุดคัดลายมือ →</button>
+          </div>
+          <div class="m1-day-card">
+            <span class="m1-tag">🎵 C-Pop & Camera</span>
+            <div style="font-weight:700;margin:6px 0 4px">แกะเพลงจีน & ถ่ายรูปแปลเมนูอาหาร</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">วางเนื้อเพลงแตะแปลทุกคำ หรือถ่ายรูปเมนูร้านจีน</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="btn-primary m1-mini-btn" id="td-go-lyrics">🎵 แกะเพลง</button>
+              <button type="button" class="btn-secondary m1-mini-btn" id="td-go-snap">📸 ถ่ายรูปเมนู</button>
+            </div>
+          </div>
+          <div class="m1-day-card">
+            <span class="m1-tag">⚔️ Live Social</span>
+            <div style="font-weight:700;margin:6px 0 4px">ห้องดวล 6 หลัก & ตีบอสมังกร</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">แข่งกับเพื่อนหรือรวมพลังตีบอสประจำสัปดาห์</div>
+            <button type="button" class="btn-primary m1-mini-btn" id="td-go-arena">⚔️ เข้าสู่ Arena →</button>
+          </div>
+          <div class="m1-day-card">
+            <span class="m1-tag">🗺️ ทางลัดเรียนเสริม</span>
+            <div style="font-weight:700;margin:6px 0 4px">Skill Tree & Speak Studio AI</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">20 คู่เสียง (${m1Stats.tonePairsDone}/20) · 64 ภาพจำ (${m1Stats.mnemonicsDone}/64)</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="btn-secondary m1-mini-btn" id="td-go-path">🗺️ Skill Tree</button>
+              <button type="button" class="btn-secondary m1-mini-btn" id="td-go-speak">🎙️ Speak Studio</button>
+            </div>
+          </div>
         </div>
       </div>
-
-      <!-- Arena 1v1 & Weekend Boss Raid -->
-      <div class="m1-day-card">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="m1-tag">⚔️ Live Social</span>
-          <span>🐉 Boss Raid</span>
-        </div>
-        <div style="font-weight:700;font-size:16px;margin:8px 0 4px">ห้องดวล 6 หลัก & ตีบอสมังกร 50,000 HP</div>
-        <div class="m1-muted" style="font-size:12.5px;margin-bottom:12px">แข่ง Tone Sniper / Speed Draw กับเพื่อน แชร์การ์ด PNG ลง IG Story หรือรวมพลังตีบอสประจำสัปดาห์</div>
-        <button type="button" class="btn-primary m1-mini-btn" id="td-go-arena">⚔️ เข้าสู่ Arena →</button>
-      </div>
-    </div>
-
-    <div class="card-panel" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-      <div>
-        <strong>🗺️ เส้นทางเรียนต่อจากจุดเดิม (มาตรฐานสอบผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}%)</strong>
-        <div class="m1-muted" style="font-size:12.5px">ผ่านเกณฑ์แล้ว ${m1Stats.pct}% (${m1Stats.totalDaysDone}/30 วัน) · 20 คู่เสียง (${m1Stats.tonePairsDone}/20) · 64 ภาพจำ (${m1Stats.mnemonicsDone}/64)</div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn-secondary m1-mini-btn" id="td-go-month1">🌱 ตารางสอบ 30 วัน & ภาพจำ</button>
-        <button type="button" class="btn-secondary m1-mini-btn" id="td-go-path">🗺️ Skill Tree บทเรียน</button>
-        <button type="button" class="btn-secondary m1-mini-btn" id="td-go-speak">🎙️ Speak Studio AI</button>
-      </div>
-    </div>
+    `}
   `;
 
   const redrawSelf = () => renderTodayDashboard(core, host);
 
+  host.querySelectorAll('[data-hub-sec]').forEach(b => b.addEventListener('click', () => {
+    activeHubSection = b.dataset.hubSec || 'practice';
+    redrawSelf();
+  }));
+
   host.querySelector('#td-start-15m')?.addEventListener('click', () => {
-    if (pendingBoss) {
+    if (heroActionType === 'boss' && pendingBoss) {
       renderWeeklyBossRunner(core, host, pendingBoss, {
         onPass: redrawSelf,
         onRepairDay: (dNum) => renderGuidedRunner(core, host, redrawSelf, { targetDay: dNum, bypassBossGate: true, skipFsrsGate: true }),
@@ -262,8 +280,17 @@ export function renderTodayDashboard(core, host) {
       });
       return;
     }
+    if (heroActionType === 'fsrs') {
+      renderFsrsQuizGate(core, host, { onCleared: redrawSelf, onExit: redrawSelf });
+      return;
+    }
+    if (heroActionType === 'decay' && decayedDays.length > 0) {
+      renderDecayReverifyRunner(core, host, decayedDays[0].day, redrawSelf);
+      return;
+    }
     renderGuidedRunner(core, host, redrawSelf, { targetDay: todayDay });
   });
+
   host.querySelectorAll('[data-decay-day]').forEach(b => b.addEventListener('click', () => {
     renderDecayReverifyRunner(core, host, Number(b.dataset.decayDay), redrawSelf);
   }));
@@ -287,6 +314,10 @@ export function renderTodayDashboard(core, host) {
   host.querySelector('#td-open-dict')?.addEventListener('click', () => openQuickDict(core));
   host.querySelector('#td-beginner-chk')?.addEventListener('change', (e) => {
     toggleBeginnerMode(core, e.target.checked);
+  });
+  host.querySelector('#td-large-hanzi-chk')?.addEventListener('change', (e) => {
+    setLargeHanziEnabled(e.target.checked);
+    core.showToast(e.target.checked ? '🔍 เปิดโหมดตัวจีนใหญ่พิเศษแล้ว' : 'กลับสู่ขนาดตัวอักษรปกติแล้ว');
   });
   host.querySelector('#td-go-srs')?.addEventListener('click', () => {
     core.state.vocabMode = 'srs';
