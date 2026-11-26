@@ -3980,8 +3980,9 @@ if (typeof window !== 'undefined') {
               <div class="vsrs-fc-answer">
                 <div class="vsrs-fc-py">${escapeHtml(activeWord.pinyin)}</div>
                 <div class="vsrs-fc-th">${escapeHtml(activeWord.meaning)}</div>
+                ${sess.lastQuizResult ? `<div style="margin-top:6px;font-size:12.5px;font-weight:700;color:${sess.lastQuizResult.ok ? 'var(--sys-green-text,#16a34a)' : 'var(--sys-red-text,#dc2626)'}">${sess.lastQuizResult.msg}</div>` : ''}
               </div>
-            ` : `<div class="vsrs-fc-hint">แตะการ์ดเพื่อเฉลยพินอินและคำแปลไทย</div>`}
+            ` : `<div class="vsrs-fc-hint">🎯 ตอบความหมายด้านล่างให้ถูกก่อนเพื่อยืนยันว่าจำได้จริง!</div>`}
           </div>
 
           ${sess.flipped ? (() => {
@@ -3991,21 +3992,43 @@ if (typeof window !== 'undefined') {
             const dHard = computeNextFsrs(curSrs, 'hard', tk).interval;
             const dGood = computeNextFsrs(curSrs, 'good', tk).interval;
             const dEasy = computeNextFsrs(curSrs, 'easy', tk).interval;
+            const recRate = sess.lastQuizResult ? sess.lastQuizResult.recRate : 'good';
             return `
-            <div style="text-align:center;font-size:12px;color:var(--sys-accent-text);font-weight:600;margin:6px 0">🧠 FSRS Memory Retrievability: ${rPct}%</div>
+            <div style="text-align:center;font-size:12px;color:var(--sys-accent-text);font-weight:600;margin:6px 0">🧠 FSRS Memory Retrievability: ${rPct}% · แนะนำ: <b>${recRate.toUpperCase()}</b></div>
             <div class="vsrs-rate-bar">
-              <button type="button" class="vsrs-rate-btn r-again" data-rate="again"><b>ลืมแล้ว</b><small>[1] ทวนซ้ำวันนี้</small></button>
-              <button type="button" class="vsrs-rate-btn r-hard" data-rate="hard"><b>จำไม่ค่อยแม่น</b><small>[2] +${dHard} วัน</small></button>
-              <button type="button" class="vsrs-rate-btn r-good" data-rate="good"><b>จำได้</b><small>[3] +${dGood} วัน</small></button>
-              <button type="button" class="vsrs-rate-btn r-easy" data-rate="easy"><b>ง่ายมาก!</b><small>[4] +${dEasy} วัน</small></button>
+              <button type="button" class="vsrs-rate-btn r-again" data-rate="again" ${recRate === 'again' ? 'style="outline:2px solid var(--sys-red)"' : ''}><b>ลืมแล้ว</b><small>[1] ทวนซ้ำวันนี้</small></button>
+              <button type="button" class="vsrs-rate-btn r-hard" data-rate="hard" ${recRate === 'hard' ? 'style="outline:2px solid var(--sys-orange)"' : ''}><b>จำไม่ค่อยแม่น</b><small>[2] +${dHard} วัน</small></button>
+              <button type="button" class="vsrs-rate-btn r-good" data-rate="good" ${recRate === 'good' ? 'style="outline:2px solid var(--sys-accent)"' : ''}><b>จำได้ ✓</b><small>[3] +${dGood} วัน</small></button>
+              <button type="button" class="vsrs-rate-btn r-easy" data-rate="easy" ${recRate === 'easy' ? 'style="outline:2px solid var(--sys-green)"' : ''}><b>แม่นไวมาก!</b><small>[4] +${dEasy} วัน</small></button>
             </div>
             `;
-          })() : `
-            <div style="text-align:center;margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-              <button type="button" class="btn-primary" id="vsrs-flip-btn">พลิกดูเฉลย →</button>
+          })() : (() => {
+            if (!sess.cardShownAt || sess.cardWordId !== activeWord.id) {
+              sess.cardShownAt = Date.now();
+              sess.cardWordId = activeWord.id;
+              const pool = getVocabIndex();
+              const distractors = [];
+              let guard = 0;
+              while (distractors.length < 3 && guard < 40 && pool.length > 4) {
+                const cand = pool[Math.floor(Math.random() * pool.length)];
+                if (cand && cand.meaning !== activeWord.meaning && !distractors.includes(cand.meaning)) {
+                  distractors.push(cand.meaning);
+                }
+                guard++;
+              }
+              sess.cardChoices = shuffleArray([activeWord.meaning, ...distractors]);
+            }
+            return `
+            <div style="display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:12px">
+              ${(sess.cardChoices || [activeWord.meaning]).map((ch, ci) => `
+                <button type="button" class="btn-secondary" style="text-align:left;padding:10px 12px;font-weight:600" data-vsrs-ans="${ci}">${escapeHtml(ch)}</button>
+              `).join('')}
+            </div>
+            <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
               <button type="button" class="btn-secondary" id="vsrs-bedtime-inline">🌙 โหมดทวนก่อนนอน 3 นาที (12 คำเสี่ยงลืม)</button>
             </div>
-          `}
+            `;
+          })()}
           <div style="text-align:center;font-size:12px;color:var(--sys-label-3);margin-top:10px">ระบบ FSRS-4.5 ลดภาระการ์ดซ้ำ ~25% · คีย์ลัด: Space พลิกการ์ด · 1–4 ให้คะแนน · R ฟังเสียงซ้ำ</div>
         </div>
       ` : `
@@ -4033,12 +4056,38 @@ if (typeof window !== 'undefined') {
       if (activeWord) openVocabDetailModal(activeWord.id);
     });
     const flipCard = () => {
-      if (!activeWord) return;
-      sess.flipped = !sess.flipped;
+      if (!activeWord || !sess.flipped) return;
       renderVocabSrs();
     };
     document.getElementById('vsrs-flashcard')?.addEventListener('click', flipCard);
-    document.getElementById('vsrs-flip-btn')?.addEventListener('click', flipCard);
+
+    container.querySelectorAll('[data-vsrs-ans]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!activeWord) return;
+        const picked = (sess.cardChoices || [])[Number(btn.dataset.vsrsAns)];
+        const elapsed = Date.now() - (sess.cardShownAt || Date.now());
+        const ok = picked === activeWord.meaning;
+        speak(activeWord.hanzi);
+        if (!ok) {
+          // Wrong answer: immediately record FSRS lapse ('again'), reveal answer, and re-queue!
+          const tk = todayKey();
+          srsMap[activeWord.id] = computeNextFsrs(srsMap[activeWord.id], 'again', tk);
+          sess.queue.push(activeWord);
+          sess.lastQuizResult = { ok: false, recRate: 'again', msg: `✗ ตอบผิด (เลือก "${picked}") — ระบบจัดให้ทวนซ้ำในรอบนี้ทันที` };
+          sess.flipped = true;
+          playChime('err');
+          saveProgress();
+          renderVocabSrs();
+          return;
+        }
+        const recRate = elapsed <= 3200 ? 'easy' : (elapsed <= 7500 ? 'good' : 'hard');
+        const sec = (elapsed / 1000).toFixed(1);
+        sess.lastQuizResult = { ok: true, recRate, msg: `✓ ตอบถูกใน ${sec} วินาที! กดปุ่มด้านล่างเพื่อบันทึกตาราง FSRS` };
+        sess.flipped = true;
+        playChime('ok');
+        renderVocabSrs();
+      });
+    });
 
     const startBedtime3Min = () => {
       const allL = getVocabQuizPool('all_learned');
@@ -4072,6 +4121,9 @@ if (typeof window !== 'undefined') {
         sess.doneCount++;
         sess.idx++;
         sess.flipped = false;
+        sess.lastQuizResult = null;
+        sess.cardShownAt = 0;
+        sess.cardWordId = null;
         playChime(rate === 'again' ? 'err' : 'ok');
         if (sess.idx >= sess.queue.length) {
           sess.queue = [];

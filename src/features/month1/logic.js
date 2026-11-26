@@ -626,3 +626,293 @@ export function searchDictionary(query, { vocabWords = [], lexicon = [] } = {}, 
   for (const c of candidates) push(c);
   return out;
 }
+
+
+// ============================================================================
+// MAXIMUM RETENTION SUITE:
+// 1) Auto-Enrolled Quiz-Backed FSRS (`collectDayFsrsItems`, `getDueMonth1FsrsCards`, `gradeQuizFsrsResponse`)
+// 2) Memory Decay & 7/21-Day Speed Re-Verify (`getDecayedDays`, `buildDecayPopQuiz`)
+// 3) 4-Second Reflex Speaking Prompts (`buildReflexPrompts`)
+// 4) Infinite Adaptive Weakness Grinder (`buildWeaknessQueue`)
+// 5) Weekly Cumulative Boss Exam Day 7/14/21/30 (`WEEKLY_BOSS_DAYS`, `getPendingWeeklyBoss`, `buildWeeklyBossExam`)
+// ============================================================================
+import { diffDaysBetweenKeys, computeRetrievability } from '../../modules/srs-sm2.js';
+
+export const WEEKLY_BOSS_DAYS = [7, 14, 21, 30];
+
+/**
+ * Extracts all core phrases, tone pairs, and mnemonics studied on `dayNum` for automatic FSRS enrollment.
+ */
+export function collectDayFsrsItems(dayNum) {
+  const s = buildGuidedSession(dayNum, []);
+  const items = [];
+  const seen = new Set();
+  const push = (hz, py, th, kind) => {
+    const cleanHz = String(hz || '').replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim();
+    if (!cleanHz || seen.has(cleanHz)) return;
+    seen.add(cleanHz);
+    items.push({ id: cleanHz, hz: cleanHz, py: String(py || '').trim(), th: String(th || '').trim(), kind, sourceDay: s.day });
+  };
+  s.toneFocus.forEach(t => push(t.hz, t.py, t.th, 'tone'));
+  s.mnemFocus.forEach(m => push(m.hz, m.py, m.th, 'mnem'));
+  s.speakItems.forEach(sp => push(sp.hz, sp.py, sp.th, 'sentence'));
+  return items;
+}
+
+/**
+ * Returns due FSRS cards from `ext.month1.fsrsDeck` sorted by lowest retrievability first.
+ */
+export function getDueMonth1FsrsCards(fsrsDeck = {}, todayKey) {
+  if (!fsrsDeck || typeof fsrsDeck !== 'object' || !todayKey) return [];
+  const due = [];
+  for (const card of Object.values(fsrsDeck)) {
+    if (!card || !card.hz || !card.srs) continue;
+    if (String(card.srs.nextDue || '') <= todayKey) {
+      const r = computeRetrievability(card.srs, todayKey);
+      due.push({ ...card, retrievability: r });
+    }
+  }
+  due.sort((a, b) => a.retrievability - b.retrievability || (b.srs.lapses || 0) - (a.srs.lapses || 0));
+  return due;
+}
+
+/**
+ * Maps objective quiz accuracy + response speed into an objective FSRS rating ('again'|'hard'|'good'|'easy')
+ * so learners cannot inflate self-reported flashcard ratings.
+ */
+export function gradeQuizFsrsResponse({ isCorrect, elapsedMs = 5000 }) {
+  if (!isCorrect) return 'again';
+  const ms = Math.max(0, Number(elapsedMs) || 5000);
+  if (ms <= 3200) return 'easy';
+  if (ms <= 7500) return 'good';
+  return 'hard';
+}
+
+/**
+ * Identifies previously passed days (1..30) whose memory verification has decayed:
+ * - Tier 1 check due >= 7 days after passing
+ * - Tier 2 check due >= 21 days after passing
+ * - Ongoing check every 30 days after last verification
+ */
+export function getDecayedDays(ext = {}, todayKey) {
+  const dm = ext?.dayMastery && typeof ext.dayMastery === 'object' ? ext.dayMastery : {};
+  if (!todayKey) return [];
+  const decayed = [];
+  for (let d = 1; d <= 30; d++) {
+    const rec = dm[d] || dm[String(d)];
+    if (!rec || !rec.passed || Number(rec.bestPct || 0) < DAILY_MASTERY_PASS_PCT) continue;
+    const passedAt = rec.passedAt || '';
+    if (!passedAt) continue;
+    const lastVer = rec.lastVerifiedAt || passedAt;
+    const tier = Number(rec.verifyTier) || 0;
+    const daysSincePass = diffDaysBetweenKeys(passedAt, todayKey);
+    const daysSinceVer = diffDaysBetweenKeys(lastVer, todayKey);
+
+    let dueReason = '';
+    if (tier === 0 && daysSincePass >= 7) {
+      dueReason = `ผ่านครบ ${daysSincePass} วันแล้ว (รอบทวน 7 วัน)`;
+    } else if (tier === 1 && daysSincePass >= 21 && daysSinceVer >= 7) {
+      dueReason = `ผ่านครบ ${daysSincePass} วันแล้ว (รอบทวน 21 วัน)`;
+    } else if (tier >= 2 && daysSinceVer >= 30) {
+      dueReason = `ไม่ได้เช็กซ้ำมา ${daysSinceVer} วัน (รอบทวนรายเดือน)`;
+    }
+    if (dueReason) {
+      decayed.push({ day: d, daysSincePass, daysSinceVer, verifyTier: tier, reason: dueReason, bestPct: rec.bestPct });
+    }
+  }
+  return decayed;
+}
+
+/**
+ * Builds a fast 5-item Re-Verify Pop-Quiz (4 closed-book/progressive questions + 1 mic speaking = 6 pts, >=95% = 6/6 required).
+ */
+export function buildDecayPopQuiz(dayNum, { seed = Date.now() } = {}) {
+  const full = buildDailyMasteryExam(dayNum, { seed });
+  return {
+    day: full.day,
+    passPct: DAILY_MASTERY_PASS_PCT,
+    questions: full.questions.slice(0, 4),
+    speakingPrompts: full.speakingPrompts.slice(0, 1),
+    totalPoints: 6
+  };
+}
+
+export function isWeeklyBossPassed(checkpointDay, ext = {}) {
+  const wb = ext?.weeklyBoss && typeof ext.weeklyBoss === 'object' ? ext.weeklyBoss : {};
+  const rec = wb[checkpointDay] || wb[String(checkpointDay)];
+  return Boolean(rec && rec.passed && Number(rec.bestPct || 0) >= DAILY_MASTERY_PASS_PCT);
+}
+
+/**
+ * Returns the Weekly Boss checkpoint day (7, 14, 21, or 30) if all days in that week (1..checkpointDay)
+ * are mastered (>=95%), BEFORE allowing progression to the next week!
+ */
+export function getPendingWeeklyBoss(progress = {}, ext = {}) {
+  if (!ext || !ext.dayMastery || typeof ext.dayMastery !== 'object') return null;
+  for (const cp of WEEKLY_BOSS_DAYS) {
+    let allUpToCpMastered = true;
+    for (let d = 1; d <= cp; d++) {
+      if (!isDayMastered(d, progress, ext)) {
+        allUpToCpMastered = false;
+        break;
+      }
+    }
+    if (allUpToCpMastered && !isWeeklyBossPassed(cp, ext)) {
+      return cp;
+    }
+  }
+  return null;
+}
+
+/**
+ * Builds a cumulative 20-point Weekly Boss Exam spanning ALL days from Day 1..checkpointDay!
+ * Every question & speaking prompt carries `sourceDay` so a failed attempt pinpoints exact forgotten days.
+ */
+export function buildWeeklyBossExam(checkpointDay, { planArray = [], mistakes = [], seed = Date.now() } = {}) {
+  const cp = WEEKLY_BOSS_DAYS.includes(Number(checkpointDay)) ? Number(checkpointDay) : 7;
+  const rng = seededRng(seed + cp * 313);
+  const dayPool = [];
+  for (let d = 1; d <= cp; d++) dayPool.push(d);
+  const shuffledDays = shuffleWithRng(dayPool, rng);
+
+  const questions = [];
+  const speakingPrompts = [];
+  const usedPromptKeys = new Set();
+
+  // Sample across all days 1..cp to reach 14 diverse cumulative questions + 3 cumulative speaking prompts
+  let cursor = 0;
+  while (questions.length < EXAM_QUIZ_COUNT && cursor < 60) {
+    const d = shuffledDays[cursor % shuffledDays.length];
+    const planObj = Array.isArray(planArray) ? planArray.find(x => Number(x.day) === d) : null;
+    const subExam = buildDailyMasteryExam(d, { planDayObj: planObj, mistakes, seed: seed + cursor * 41 });
+    for (const q of subExam.questions) {
+      const key = `${q.kind}:${q.prompt}`;
+      if (!usedPromptKeys.has(key)) {
+        usedPromptKeys.add(key);
+        questions.push({
+          ...q,
+          id: `boss-d${d}-${questions.length}`,
+          sourceDay: d,
+          category: `สะสม Day ${d} · ${q.category}`
+        });
+        break;
+      }
+    }
+    cursor++;
+  }
+
+  const speakDays = shuffleWithRng(dayPool, rng);
+  for (let i = 0; i < speakDays.length && speakingPrompts.length < EXAM_SPEAK_COUNT; i++) {
+    const d = speakDays[i];
+    const subExam = buildDailyMasteryExam(d, { seed: seed + i * 73 });
+    const sp = subExam.speakingPrompts[0];
+    if (sp && !speakingPrompts.some(x => x.hz === sp.hz)) {
+      speakingPrompts.push({ ...sp, sourceDay: d });
+    }
+  }
+
+  return {
+    checkpointDay: cp,
+    weekNumber: Math.ceil(cp / 7),
+    passPct: DAILY_MASTERY_PASS_PCT,
+    totalPoints: EXAM_TOTAL_POINTS,
+    questions: shuffleWithRng(questions.slice(0, EXAM_QUIZ_COUNT), rng),
+    speakingPrompts
+  };
+}
+
+/**
+ * Aggregates missed items from a Weekly Boss Exam by `sourceDay` so the learner knows exact days to restudy.
+ */
+export function diagnoseWeakDaysFromBoss(missedItems = []) {
+  const counts = new Map();
+  for (const m of missedItems) {
+    const d = Number(m?.sourceDay) || 0;
+    if (d >= 1 && d <= 30) {
+      counts.set(d, (counts.get(d) || 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([day, misses]) => ({ day, misses }))
+    .sort((a, b) => b.misses - a.misses || a.day - b.day);
+}
+
+/**
+ * Generates rapid-fire Q&A / situational prompts for the 4-Second Reflex Speaking Mode.
+ */
+export function buildReflexPrompts(maxDay = 1, count = 8, seed = Date.now()) {
+  const rng = seededRng(seed);
+  const safeMax = Math.max(1, Math.min(30, Number(maxDay) || 1));
+  const pool = [];
+  for (let d = 1; d <= safeMax; d++) {
+    const s = buildGuidedSession(d, []);
+    s.speakItems.forEach(item => {
+      const cleanHz = item.hz.replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim();
+      const cleanPy = item.py.replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim();
+      if (normalizeChinese(cleanHz).length >= 2 && !pool.some(p => p.hz === cleanHz)) {
+        pool.push({
+          hz: cleanHz,
+          py: cleanPy,
+          th: item.th,
+          cue: `สถานการณ์: พูดว่า "${item.th}" ทันที!`,
+          sourceDay: d
+        });
+      }
+    });
+  }
+  const base = pool.length >= count ? pool : [
+    ...pool,
+    ...SURVIVAL_50
+      .map(s => ({
+        hz: s.hz.replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim(),
+        py: s.py.replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim(),
+        th: s.th,
+        cue: `สถานการณ์: พูดว่า "${s.th}" ทันที!`,
+        sourceDay: 1
+      }))
+      .filter(s => normalizeChinese(s.hz).length >= 2 && !pool.some(p => p.hz === s.hz))
+  ];
+  return shuffleWithRng(base, rng).slice(0, count);
+}
+
+/**
+ * Builds an interleaved multi-mode practice batch from the learner's weakest items (mistakes + fragile FSRS + tone traps).
+ */
+export function buildWeaknessQueue({ mistakes = [], fsrsDeck = {}, maxDay = 1, count = 8, seed = Date.now() } = {}) {
+  const rng = seededRng(seed);
+  const rawPool = [];
+  const seen = new Set();
+  const add = (hz, py, th, weight, tag) => {
+    const cleanHz = String(hz || '').replace(/…/g, '').replace(/\s*\/\s*.*/, '').trim();
+    if (!cleanHz || !th || seen.has(cleanHz)) return;
+    seen.add(cleanHz);
+    rawPool.push({ hz: cleanHz, py: String(py || '').trim(), th: String(th || '').trim(), weight, tag });
+  };
+
+  for (const m of (Array.isArray(mistakes) ? mistakes : [])) {
+    add(m?.hanzi || m?.hz, m?.pinyin || m?.py, m?.meaning || m?.th, 100 + (m?.misses || 1) * 15, 'คำที่เคยตอบผิด');
+  }
+  for (const card of Object.values(fsrsDeck || {})) {
+    if (card?.hz && card?.srs && ((card.srs.lapses || 0) > 0 || (card.srs.difficulty || 5) >= 6.5)) {
+      add(card.hz, card.py, card.th, 80 + (card.srs.lapses || 0) * 12, 'คำเสี่ยงลืมใน FSRS');
+    }
+  }
+  const s = buildGuidedSession(maxDay, []);
+  s.toneFocus.forEach(t => add(t.hz, t.py, t.th, 40, `คู่เสียง ${t.label}`));
+  s.speakItems.forEach(sp => add(sp.hz, sp.py, sp.th, 35, `ประโยค Day ${maxDay}`));
+  TONE_PAIRS.forEach(t => add(t.hz, t.py, t.th, 20, `คู่เสียง ${t.label}`));
+
+  rawPool.sort((a, b) => b.weight - a.weight);
+  const topCandidates = shuffleWithRng(rawPool.slice(0, Math.max(count * 2, 12)), rng).slice(0, count);
+  const modes = ['ear', 'pinyin', 'speak', 'meaning'];
+
+  return topCandidates.map((item, idx) => {
+    const mode = item.py ? modes[idx % modes.length] : 'meaning';
+    const distractors = shuffleWithRng(SURVIVAL_50.filter(x => x.th !== item.th), rng).slice(0, 3).map(d => d.th);
+    return {
+      ...item,
+      drillMode: mode,
+      options: shuffleWithRng([item.th, ...distractors], rng)
+    };
+  });
+}

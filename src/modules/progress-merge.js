@@ -161,10 +161,38 @@ export function mergeCloudProgressData(localP, cloudP) {
           ...newer,
           bestPct,
           attempts: Math.max(Number(a.attempts) || 0, Number(b.attempts) || 0),
+          verifyTier: Math.max(Number(a.verifyTier) || 0, Number(b.verifyTier) || 0),
           passed: Boolean(a.passed || b.passed) && bestPct >= 95
         };
       }
       mergedM1.dayMastery = dm;
+    }
+    if (mLocal.weeklyBoss || mCloud.weeklyBoss) {
+      const wb = {};
+      const bossKeys = new Set([
+        ...Object.keys(mLocal.weeklyBoss || {}),
+        ...Object.keys(mCloud.weeklyBoss || {})
+      ]);
+      for (const k of bossKeys) {
+        const a = mLocal.weeklyBoss?.[k] || {};
+        const b = mCloud.weeklyBoss?.[k] || {};
+        const bestPct = Math.max(Number(a.bestPct) || 0, Number(b.bestPct) || 0);
+        wb[k] = {
+          ...a,
+          ...b,
+          bestPct,
+          attempts: Math.max(Number(a.attempts) || 0, Number(b.attempts) || 0),
+          passed: Boolean(a.passed || b.passed) && bestPct >= 95
+        };
+      }
+      mergedM1.weeklyBoss = wb;
+    }
+    if (mLocal.fsrsDeck || mCloud.fsrsDeck) {
+      mergedM1.fsrsDeck = mergeTimestampedMap(
+        mLocal.fsrsDeck || {},
+        mCloud.fsrsDeck || {},
+        (x) => (x?.srs?.reviews || 0) * 10 + (x?.srs?.step || 0)
+      );
     }
     merged.ext.month1 = mergedM1;
   }

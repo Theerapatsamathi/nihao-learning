@@ -1,8 +1,18 @@
 // UI Views for Month-1 Starter Pack (Home/30-Day Blueprint, 20 Tone Pairs + Traps, 64 Mnemonics, 50 Survival Sentences)
 import { TONE_PAIRS, THAI_TRAPS, MONTH1_DAYS_15_30, HANZI_MNEMONICS, SURVIVAL_50 } from './data-month1.js';
-import { DAILY_MASTERY_PASS_PCT, calcMonth1Stats, getTodayBlueprintDay, getDayMasteryRecord, isDayMastered } from './logic.js';
+import {
+  DAILY_MASTERY_PASS_PCT,
+  WEEKLY_BOSS_DAYS,
+  calcMonth1Stats,
+  getTodayBlueprintDay,
+  getDayMasteryRecord,
+  isDayMastered,
+  getDecayedDays,
+  isWeeklyBossPassed
+} from './logic.js';
 import { openQuickDict, showStrokePreview } from './quick-dict.js';
 import { renderGuidedRunner, toggleBeginnerMode } from './guided-session.js';
+import { renderDecayReverifyRunner, renderReflexSpeakingRunner, renderWeaknessGrinder, renderWeeklyBossRunner } from './mastery-drills.js';
 
 const uiState = { subTab: 'home', survCat: 'all', mnemQuery: '', toneQuiz: null };
 
@@ -42,14 +52,18 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
   const beginnerOn = Boolean(ext.beginnerMode);
   const curRec = getDayMasteryRecord(todayDay, ext);
   const plan14 = Array.isArray(window.DAILY_PLAN_DATA) ? window.DAILY_PLAN_DATA : [];
+  const decayedSet = new Set(getDecayedDays(ext, core.todayKey()).map(x => x.day));
 
   const renderDayCard = (dObj, isFirstHalf) => {
     const dayNum = dObj.day;
     const mastered = isDayMastered(dayNum, core.state.progress, ext);
+    const isDecayed = decayedSet.has(dayNum);
     const rec = getDayMasteryRecord(dayNum, ext);
     const isCur = dayNum === todayDay;
     let badgeHtml = `<span class="m1-status-pill pending">🔒 รอสอบ ≥${DAILY_MASTERY_PASS_PCT}%</span>`;
-    if (mastered) {
+    if (mastered && isDecayed) {
+      badgeHtml = `<span class="m1-status-pill pending">🔔 ถึงรอบเช็กความจำซ้ำ!</span>`;
+    } else if (mastered) {
       badgeHtml = `<span class="m1-status-pill pass">✅ ผ่าน ${rec.bestPct || 100}%</span>`;
     } else if (rec.attempts > 0) {
       badgeHtml = `<span class="m1-status-pill fail">⚠️ ล่าสุด ${rec.lastPct}% (ยังไม่ถึง ${DAILY_MASTERY_PASS_PCT}%)</span>`;
@@ -58,6 +72,22 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
     const words = isFirstHalf
       ? (Array.isArray(dObj.quickReview) ? dObj.quickReview.slice(0, 4).map(x => x.hanzi) : [])
       : (Array.isArray(dObj.words) ? dObj.words : []);
+
+    const bossCardAfter = WEEKLY_BOSS_DAYS.includes(dayNum) ? (() => {
+      const bossOk = isWeeklyBossPassed(dayNum, ext);
+      const bossRec = (ext.weeklyBoss || {})[dayNum];
+      return `
+        <div class="m1-day-card ${bossOk ? 'done' : 'current'}" style="border-width:2px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+            <span class="m1-tag">🐉 บอสประจำสัปดาห์ W${Math.ceil(dayNum / 7)}</span>
+            <span class="m1-status-pill ${bossOk ? 'pass' : 'fail'}">${bossOk ? `✅ ผ่านบอส ${bossRec?.bestPct || 95}%` : `🎯 ต้องผ่าน ≥${DAILY_MASTERY_PASS_PCT}%`}</span>
+          </div>
+          <div style="font-weight:700;margin:6px 0 3px">สอบใหญ่สะสม Day 1 – Day ${dayNum}</div>
+          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ยำรวมข้อสอบทุกวันตั้งแต่เริ่มเรียน พร้อมชี้เป้าวันที่ลืม</div>
+          <button type="button" class="btn-primary m1-mini-btn" data-launch-boss="${dayNum}">🐉 เข้าสอบบอส W${Math.ceil(dayNum / 7)} →</button>
+        </div>
+      `;
+    })() : '';
 
     return `
       <div class="m1-day-card ${mastered ? 'done' : ''} ${isCur ? 'current' : ''}">
@@ -71,12 +101,13 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
           ${words.map(w => `<button type="button" class="m1-chip hanzi-font" data-say="${core.escapeHtml(w)}">🔊 ${core.escapeHtml(w)}</button>`).join('')}
         </div>
         <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
-          <button type="button" class="btn-primary m1-mini-btn" data-launch-day="${dayNum}">
+          ${isDecayed ? `<button type="button" class="btn-primary m1-mini-btn" data-reverify-day="${dayNum}">🔔 เช็กความจำ 5 ข้อ</button>` : ''}
+          <button type="button" class="${isDecayed ? 'btn-secondary' : 'btn-primary'} m1-mini-btn" data-launch-day="${dayNum}">
             ${mastered ? `🔄 ทวน & สอบซ้ำ` : (rec.attempts > 0 ? `📖 เรียนซ่อม & สอบใหม่` : `▶ เรียน & สอบ Day ${dayNum}`)}
           </button>
           ${!isFirstHalf ? `<button type="button" class="btn-secondary m1-mini-btn" data-go-tab="${dObj.tab}">สื่อเสริม →</button>` : `<button type="button" class="btn-secondary m1-mini-btn" data-open-plan14="${dayNum}">เนื้อหาละเอียด</button>`}
         </div>
-      </div>`;
+      </div>${bossCardAfter}`;
   };
 
   body.innerHTML = `
@@ -89,6 +120,8 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
           <button type="button" class="btn-primary" id="m1-start-guided">
             ${curRec.attempts > 0 && !curRec.passed ? `📖 เรียนทบทวน & สอบแก้ตัว Day ${todayDay}` : `▶ เริ่มเรียน & สอบ Day ${todayDay} (≥${DAILY_MASTERY_PASS_PCT}%)`}
           </button>
+          <button type="button" class="btn-secondary" id="m1-go-reflex">⚡ พูดสวนกลับ 4 วิ</button>
+          <button type="button" class="btn-secondary" id="m1-go-weakness">💪 ซ้อมขยี้จุดอ่อน</button>
           <label class="m1-toggle-chip">
             <input type="checkbox" id="m1-beginner-chk" ${beginnerOn ? 'checked' : ''}>
             <span>โหมดเดือนแรก (ซ่อนเมนูขั้นสูง)</span>
@@ -127,6 +160,25 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
   body.querySelector('#m1-start-guided')?.addEventListener('click', () => {
     renderGuidedRunner(core, body, () => renderMonth1Tab(core, rootHost), { targetDay: todayDay });
   });
+  body.querySelector('#m1-go-reflex')?.addEventListener('click', () => {
+    renderReflexSpeakingRunner(core, body, () => renderMonth1Tab(core, rootHost));
+  });
+  body.querySelector('#m1-go-weakness')?.addEventListener('click', () => {
+    renderWeaknessGrinder(core, body, () => renderMonth1Tab(core, rootHost));
+  });
+  body.querySelectorAll('[data-reverify-day]').forEach(b => b.addEventListener('click', () => {
+    renderDecayReverifyRunner(core, body, Number(b.dataset.reverifyDay), () => renderMonth1Tab(core, rootHost));
+    body.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }));
+  body.querySelectorAll('[data-launch-boss]').forEach(b => b.addEventListener('click', () => {
+    const cp = Number(b.dataset.launchBoss);
+    renderWeeklyBossRunner(core, body, cp, {
+      onPass: () => renderMonth1Tab(core, rootHost),
+      onRepairDay: (dNum) => renderGuidedRunner(core, body, () => renderMonth1Tab(core, rootHost), { targetDay: dNum, bypassBossGate: true, skipFsrsGate: true }),
+      onExit: () => renderMonth1Tab(core, rootHost)
+    });
+    body.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }));
   body.querySelector('#m1-beginner-chk')?.addEventListener('change', (e) => {
     toggleBeginnerMode(core, e.target.checked);
   });

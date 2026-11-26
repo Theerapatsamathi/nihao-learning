@@ -7,9 +7,12 @@ import {
   evaluateDailyMasteryAttempt,
   getTodayBlueprintDay,
   getDayMasteryRecord,
-  getProgressivePinyin
+  getProgressivePinyin,
+  getDueMonth1FsrsCards,
+  getPendingWeeklyBoss
 } from './logic.js';
 import { SURVIVAL_50 } from './data-month1.js';
+import { enrollDayInFsrs, renderFsrsQuizGate, renderWeeklyBossRunner } from './mastery-drills.js';
 import { hasSpeechRecognition, startSpeechRecognition, getCharPinyinMap, addToReviewQueue } from '../speak-studio/speech.js';
 import { scorePronunciation } from '../speak-studio/scoring.js';
 
@@ -195,8 +198,10 @@ function mountExamStage(core, host, { dayNum, onPassContinue, onRestudy, onExit,
     }, { save: true, reason: evalRes.passed ? `สอบผ่าน Day ${dayNum} (${evalRes.pct}%)` : `บันทึกผลสอบ Day ${dayNum} (${evalRes.pct}%)` });
 
     if (evalRes.passed) {
+      // Auto-enroll all learned phrases, tone pairs & mnemonics of this day into FSRS!
+      enrollDayInFsrs(core, dayNum);
       if (!wasAlreadyPassed) {
-        core.addXp(50, `🏆 สอบผ่าน Day ${dayNum} ด้วยคะแนน ${evalRes.pct}% (≥95%)!`);
+        core.addXp(50, `🏆 สอบผ่าน Day ${dayNum} ด้วยคะแนน ${evalRes.pct}% (≥95%) + บันทึกคำเข้า FSRS อัตโนมัติ!`);
       } else {
         core.addXp(10, `ทบทวนสอบผ่าน Day ${dayNum} ซ้ำ (${evalRes.pct}%)`);
       }
@@ -654,7 +659,32 @@ export function renderExamOnlyRunner(core, host, dayNum, onDone) {
  * Cannot skip study steps, and Day is NOT completed until exam score >= 95%.
  */
 export function renderGuidedRunner(core, host, onDone, opts = {}) {
-  const day = Number(opts.targetDay) || getTodayBlueprintDay(core.state.progress, core.getExt('month1'));
+  const extNow = core.getExt('month1') || {};
+  const day = Number(opts.targetDay) || getTodayBlueprintDay(core.state.progress, extNow);
+
+  // 1) Weekly Cumulative Boss Gate: if learner completed Week 1/2/3/4 days (e.g. Day 1..7) and tries to advance past checkpoint without passing the Boss Exam >=95%, enforce Weekly Boss first!
+  const pendingBoss = getPendingWeeklyBoss(core.state.progress, extNow);
+  if (pendingBoss && day > pendingBoss && !opts.bypassBossGate) {
+    renderWeeklyBossRunner(core, host, pendingBoss, {
+      onPass: () => renderGuidedRunner(core, host, onDone, { ...opts, bypassBossGate: true }),
+      onRepairDay: (repairDayNum) => renderGuidedRunner(core, host, onDone, { targetDay: repairDayNum, bypassBossGate: true, skipFsrsGate: true }),
+      onExit: onDone
+    });
+    return;
+  }
+
+  // 2) Morning Quiz-FSRS Gate: if there are due FSRS cards waiting today, require clearing them to 0 before starting a new unpassed day!
+  const dayRecNow = getDayMasteryRecord(day, extNow);
+  const dueFsrsCards = getDueMonth1FsrsCards(extNow.fsrsDeck || {}, core.todayKey());
+  if (!opts.skipFsrsGate && !dayRecNow.passed && dueFsrsCards.length > 0) {
+    renderFsrsQuizGate(core, host, {
+      gateForDay: day,
+      onCleared: () => renderGuidedRunner(core, host, onDone, { ...opts, skipFsrsGate: true }),
+      onExit: onDone
+    });
+    return;
+  }
+
   const session = buildGuidedSession(day, core.state.progress.mistakes || []);
   let step = 0; // 0: closed-book warmup recall, 1: tone pairs, 2: speak 5 + mic practice, 3: 95% mastery exam
   const checkedWarmup = new Set();
