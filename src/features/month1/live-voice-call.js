@@ -4,9 +4,15 @@
 import { renderMicWaveHtml } from './ux-utils.js';
 
 export const GEMINI_KEY_STORAGE = 'nihao_gemini_api_key';
+const DEFAULT_GEMINI_KEY = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || '';
 
 export function getSavedGeminiKey() {
-  try { return (localStorage.getItem(GEMINI_KEY_STORAGE) || '').trim(); } catch { return ''; }
+  try {
+    const saved = (localStorage.getItem(GEMINI_KEY_STORAGE) || '').trim();
+    return saved || DEFAULT_GEMINI_KEY;
+  } catch {
+    return DEFAULT_GEMINI_KEY;
+  }
 }
 
 export function setSavedGeminiKey(key) {
