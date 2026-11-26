@@ -148,7 +148,7 @@ export function initUxEnhancements(core) {
       { tab: 'month1', icon: '🗺️', label: '90 วัน' },
       { tab: 'speak-studio', icon: '🎙️', label: 'ฝึกพูด' },
       { tab: 'vocab', icon: '📚', label: 'คลังศัพท์' },
-      { tab: 'profile', icon: '🏆', label: 'สถิติ' }
+      { tab: 'analytics', icon: '📊', label: 'สถิติ' }
     ];
     nav.innerHTML = items.map(it => `
       <button type="button" class="ux-bnav-btn" data-bnav-tab="${it.tab}">

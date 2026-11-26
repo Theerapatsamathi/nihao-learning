@@ -5,6 +5,7 @@ import { applyBeginnerMode, renderGuidedRunner, renderExamOnlyRunner } from './g
 import { renderMonth1Tab } from './views.js';
 import { renderCopybookTab } from './copybook.js';
 import { renderTodayDashboard } from './today-dashboard.js';
+import { renderAnalyticsTab } from './analytics-view.js';
 import { initUxEnhancements } from './ux-utils.js';
 
 const core = window.NihaoCore;
@@ -39,6 +40,21 @@ if (core) {
     sectionTitle: '🏠 หน้าแรกวันนี้',
     render(host) {
       renderMonth1Tab(core, host);
+    }
+  });
+
+  core.registerTab({
+    id: 'analytics',
+    label: 'ปฏิทิน & สถิติ',
+    title: '📊 ปฏิทินการเรียน · จุดเด่น/จุดด้อย & เหรียญตรา',
+    desc: 'ดูปฏิทินย้อนหลัง 12 สัปดาห์ ชั่วโมงเรียนสะสม จุดเด่น/จุดด้อย 4 ทักษะ พยากรณ์วันจบ HSK 1–3 และตู้โชว์เหรียญตรา',
+    emoji: '📊',
+    iconClass: 'icon-purple',
+    badge: 'NEW',
+    section: 'home',
+    sectionTitle: '🏠 หน้าแรกวันนี้',
+    render(host) {
+      renderAnalyticsTab(core, host);
     }
   });
 
