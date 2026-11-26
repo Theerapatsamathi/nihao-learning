@@ -1,9 +1,11 @@
 // UI Views for Month-1 Starter Pack (Home/30-Day Blueprint, 20 Tone Pairs + Traps, 64 Mnemonics, 50 Survival Sentences)
 import { TONE_PAIRS, THAI_TRAPS, MONTH1_DAYS_15_30, HANZI_MNEMONICS, SURVIVAL_50 } from './data-month1.js';
+import { MONTH2_DAYS_31_60, MONTH3_DAYS_61_90 } from './data-months23.js';
 import {
   DAILY_MASTERY_PASS_PCT,
   WEEKLY_BOSS_DAYS,
   calcMonth1Stats,
+  calc90DayStats,
   getTodayBlueprintDay,
   getDayMasteryRecord,
   isDayMastered,
@@ -14,7 +16,7 @@ import { openQuickDict, showStrokePreview } from './quick-dict.js';
 import { renderGuidedRunner, toggleBeginnerMode } from './guided-session.js';
 import { renderDecayReverifyRunner, renderReflexSpeakingRunner, renderWeaknessGrinder, renderWeeklyBossRunner } from './mastery-drills.js';
 
-const uiState = { subTab: 'home', survCat: 'all', mnemQuery: '', toneQuiz: null };
+const uiState = { subTab: 'home', activeMonth: 1, survCat: 'all', mnemQuery: '', toneQuiz: null };
 
 export function renderMonth1Tab(core, host) {
   if (!host) return;
@@ -24,7 +26,7 @@ export function renderMonth1Tab(core, host) {
 
   host.innerHTML = `
     <div class="m1-subnav">
-      <button type="button" class="m1-pill ${uiState.subTab === 'home' ? 'active' : ''}" data-sub="home">🌱 แผน 30 วัน</button>
+      <button type="button" class="m1-pill ${uiState.subTab === 'home' ? 'active' : ''}" data-sub="home">🌱 แผน 90 วัน (HSK 1–3)</button>
       <button type="button" class="m1-pill ${uiState.subTab === 'tones' ? 'active' : ''}" data-sub="tones">🎵 20 คู่วรรณยุกต์ (${stats.tonePairsDone}/20)</button>
       <button type="button" class="m1-pill ${uiState.subTab === 'mnem' ? 'active' : ''}" data-sub="mnem">🧠 64 ภาพจำอักษร (${stats.mnemonicsDone}/64)</button>
       <button type="button" class="m1-pill ${uiState.subTab === 'surv' ? 'active' : ''}" data-sub="surv">🗣️ 50 ประโยคเอาตัวรอด</button>
@@ -51,10 +53,12 @@ export function renderMonth1Tab(core, host) {
 function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
   const beginnerOn = Boolean(ext.beginnerMode);
   const curRec = getDayMasteryRecord(todayDay, ext);
+  const stats90 = calc90DayStats(core.state.progress, ext);
   const plan14 = Array.isArray(window.DAILY_PLAN_DATA) ? window.DAILY_PLAN_DATA : [];
   const decayedSet = new Set(getDecayedDays(ext, core.todayKey()).map(x => x.day));
+  const curMonth = uiState.activeMonth || (todayDay <= 30 ? 1 : (todayDay <= 60 ? 2 : 3));
 
-  const renderDayCard = (dObj, isFirstHalf) => {
+  const renderDayCard = (dObj, mode) => {
     const dayNum = dObj.day;
     const mastered = isDayMastered(dayNum, core.state.progress, ext);
     const isDecayed = decayedSet.has(dayNum);
@@ -69,22 +73,26 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
       badgeHtml = `<span class="m1-status-pill fail">⚠️ ล่าสุด ${rec.lastPct}% (ยังไม่ถึง ${DAILY_MASTERY_PASS_PCT}%)</span>`;
     }
 
-    const words = isFirstHalf
+    const words = mode === 'plan14'
       ? (Array.isArray(dObj.quickReview) ? dObj.quickReview.slice(0, 4).map(x => x.hanzi) : [])
-      : (Array.isArray(dObj.words) ? dObj.words : []);
+      : mode === 'adv'
+        ? (Array.isArray(dObj.vocab) ? dObj.vocab.slice(0, 4).map(x => x.hz) : [])
+        : (Array.isArray(dObj.words) ? dObj.words : []);
 
     const bossCardAfter = WEEKLY_BOSS_DAYS.includes(dayNum) ? (() => {
       const bossOk = isWeeklyBossPassed(dayNum, ext);
       const bossRec = (ext.weeklyBoss || {})[dayNum];
+      const wNum = Math.ceil(dayNum / 7);
+      const rangeStart = dayNum <= 30 ? 1 : (dayNum <= 60 ? 31 : 61);
       return `
         <div class="m1-day-card ${bossOk ? 'done' : 'current'}" style="border-width:2px">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
-            <span class="m1-tag">🐉 บอสประจำสัปดาห์ W${Math.ceil(dayNum / 7)}</span>
+            <span class="m1-tag">🐉 บอสประจำสัปดาห์ W${wNum}</span>
             <span class="m1-status-pill ${bossOk ? 'pass' : 'fail'}">${bossOk ? `✅ ผ่านบอส ${bossRec?.bestPct || 95}%` : `🎯 ต้องผ่าน ≥${DAILY_MASTERY_PASS_PCT}%`}</span>
           </div>
-          <div style="font-weight:700;margin:6px 0 3px">สอบใหญ่สะสม Day 1 – Day ${dayNum}</div>
-          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ยำรวมข้อสอบทุกวันตั้งแต่เริ่มเรียน พร้อมชี้เป้าวันที่ลืม</div>
-          <button type="button" class="btn-primary m1-mini-btn" data-launch-boss="${dayNum}">🐉 เข้าสอบบอส W${Math.ceil(dayNum / 7)} →</button>
+          <div style="font-weight:700;margin:6px 0 3px">สอบใหญ่สะสม Day ${rangeStart} – Day ${dayNum}</div>
+          <div class="m1-muted" style="font-size:12px;margin-bottom:10px">ยำรวมข้อสอบสะสมพร้อมชี้เป้าวันที่ลืม</div>
+          <button type="button" class="btn-primary m1-mini-btn" data-launch-boss="${dayNum}">🐉 เข้าสอบบอส W${wNum} →</button>
         </div>
       `;
     })() : '';
@@ -92,11 +100,11 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
     return `
       <div class="m1-day-card ${mastered ? 'done' : ''} ${isCur ? 'current' : ''}">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
-          <span class="m1-tag">Day ${dayNum} · W${dObj.week}</span>
+          <span class="m1-tag">Day ${dayNum} · ${dObj.level ? `${dObj.level} · ` : ''}W${dObj.week}</span>
           ${badgeHtml}
         </div>
         <div style="font-weight:700;margin:6px 0 3px">${core.escapeHtml(dObj.title)}</div>
-        <div class="m1-muted" style="font-size:12px;margin-bottom:8px">${core.escapeHtml(isFirstHalf ? dObj.goal : dObj.focus)}</div>
+        <div class="m1-muted" style="font-size:12px;margin-bottom:8px">${core.escapeHtml(mode === 'plan14' ? dObj.goal : dObj.focus)}</div>
         <div class="m1-chip-row">
           ${words.map(w => `<button type="button" class="m1-chip hanzi-font" data-say="${core.escapeHtml(w)}">🔊 ${core.escapeHtml(w)}</button>`).join('')}
         </div>
@@ -105,7 +113,7 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
           <button type="button" class="${isDecayed ? 'btn-secondary' : 'btn-primary'} m1-mini-btn" data-launch-day="${dayNum}">
             ${mastered ? `🔄 ทวน & สอบซ้ำ` : (rec.attempts > 0 ? `📖 เรียนซ่อม & สอบใหม่` : `▶ เรียน & สอบ Day ${dayNum}`)}
           </button>
-          ${!isFirstHalf ? `<button type="button" class="btn-secondary m1-mini-btn" data-go-tab="${dObj.tab}">สื่อเสริม →</button>` : `<button type="button" class="btn-secondary m1-mini-btn" data-open-plan14="${dayNum}">เนื้อหาละเอียด</button>`}
+          ${mode === 'm1_15_30' ? `<button type="button" class="btn-secondary m1-mini-btn" data-go-tab="${dObj.tab}">สื่อเสริม →</button>` : (mode === 'plan14' ? `<button type="button" class="btn-secondary m1-mini-btn" data-open-plan14="${dayNum}">เนื้อหาละเอียด</button>` : '')}
         </div>
       </div>${bossCardAfter}`;
   };
@@ -113,9 +121,9 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
   body.innerHTML = `
     <div class="card-panel m1-hero">
       <div class="m1-hero-left">
-        <div class="m1-tag">🌱 เส้นทางเดือนแรก (0 → HSK 1) · มาตรฐานสอบผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}% ทุกวัน</div>
-        <h2 style="margin:8px 0 6px">เป้าหมายปัจจุบัน: Day ${todayDay} / 30 ${curRec.passed ? '✅ สอบผ่านครบแล้ว!' : (curRec.attempts > 0 ? `(ล่าสุด ${curRec.lastPct}% · ต้องซ่อมให้ถึง ${DAILY_MASTERY_PASS_PCT}%)` : '')}</h2>
-        <p class="m1-muted" style="margin:0 0 14px">เลิกกดติ๊กผ่านหลอกตัวเอง! ทุกวันต้องผ่าน <b>ทวนคำเดิม → ฝึกวรรณยุกต์ → ซ้อมพูด → สอบฟัง+เรียงคำ+พูดออกไมค์จริง ≥ ${DAILY_MASTERY_PASS_PCT}%</b> ถึงจะปลดล็อกวันถัดไป</p>
+        <div class="m1-tag">🌱 เส้นทาง 90 วัน (0 → HSK 1 → HSK 2 → HSK 3) · มาตรฐานสอบผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}% ทุกวัน</div>
+        <h2 style="margin:8px 0 6px">เป้าหมายปัจจุบัน: Day ${todayDay} / 90 ${curRec.passed ? '✅ สอบผ่านครบแล้ว!' : (curRec.attempts > 0 ? `(ล่าสุด ${curRec.lastPct}% · ต้องซ่อมให้ถึง ${DAILY_MASTERY_PASS_PCT}%)` : '')}</h2>
+        <p class="m1-muted" style="margin:0 0 14px">ระบบล็อกคุณภาพครบ 3 เดือน: <b>เคลียร์ FSRS → เรียนและฝึกพูด → สอบรายวัน ≥ ${DAILY_MASTERY_PASS_PCT}% → สอบบอสสะสมทุกสัปดาห์</b></p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button type="button" class="btn-primary" id="m1-start-guided">
             ${curRec.attempts > 0 && !curRec.passed ? `📖 เรียนทบทวน & สอบแก้ตัว Day ${todayDay}` : `▶ เริ่มเรียน & สอบ Day ${todayDay} (≥${DAILY_MASTERY_PASS_PCT}%)`}
@@ -124,38 +132,64 @@ function renderHomeView(core, body, rootHost, ext, stats, todayDay) {
           <button type="button" class="btn-secondary" id="m1-go-weakness">💪 ซ้อมขยี้จุดอ่อน</button>
           <label class="m1-toggle-chip">
             <input type="checkbox" id="m1-beginner-chk" ${beginnerOn ? 'checked' : ''}>
-            <span>โหมดเดือนแรก (ซ่อนเมนูขั้นสูง)</span>
+            <span>โหมดโฟกัสมือใหม่</span>
           </label>
         </div>
       </div>
       <div class="m1-kpi-mini">
-        <div><strong>${stats.totalDaysDone}/30</strong><span>วันผ่าน ≥95%</span></div>
-        <div><strong>${stats.tonePairsDone}/20</strong><span>คู่เสียง</span></div>
-        <div><strong>${stats.mnemonicsDone}/64</strong><span>อักษรจำได้</span></div>
+        <div><strong>${stats90.total90Done}/90</strong><span>ผ่านครบ 90 วัน</span></div>
+        <div><strong>${stats90.m1Done}/30</strong><span>HSK 1</span></div>
+        <div><strong>${stats90.m2Done + stats90.m3Done}/60</strong><span>HSK 2–3</span></div>
       </div>
     </div>
 
-    ${plan14.length > 0 ? `
+    <div class="m1-subnav" style="margin-top:16px">
+      <button type="button" class="m1-pill ${curMonth === 1 ? 'active' : ''}" data-pick-month="1">🌱 เดือนที่ 1: Day 1–30 · HSK 1 (${stats90.m1Done}/30)</button>
+      <button type="button" class="m1-pill ${curMonth === 2 ? 'active' : ''}" data-pick-month="2">🚀 เดือนที่ 2: Day 31–60 · HSK 2 (${stats90.m2Done}/30)</button>
+      <button type="button" class="m1-pill ${curMonth === 3 ? 'active' : ''}" data-pick-month="3">👑 เดือนที่ 3: Day 61–90 · HSK 3 (${stats90.m3Done}/30)</button>
+    </div>
+
+    ${curMonth === 1 ? `
+      ${plan14.length > 0 ? `
+        <div class="card-panel" style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+            <h3 style="margin:0">📅 สัปดาห์ 1–2 (Day 1–14): พินอิน วรรณยุกต์ & รากฐานการออกเสียง</h3>
+            <button type="button" class="btn-secondary" id="m1-go-plan14">เปิดตารางเรียนละเอียด 60 นาที →</button>
+          </div>
+          <div class="m1-days-grid">
+            ${plan14.map(d => renderDayCard(d, 'plan14')).join('')}
+          </div>
+        </div>
+      ` : ''}
       <div class="card-panel" style="margin-top:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-          <h3 style="margin:0">📅 สัปดาห์ 1–2 (Day 1–14): พินอิน วรรณยุกต์ & รากฐานการออกเสียง</h3>
-          <button type="button" class="btn-secondary" id="m1-go-plan14">เปิดตารางเรียนละเอียด 60 นาที →</button>
-        </div>
+        <h3 style="margin:0 0 12px">📅 สัปดาห์ 3–4 (Day 15–30): สนทนาเอาตัวรอด แต่งประโยค & สอบจบ HSK 1</h3>
         <div class="m1-days-grid">
-          ${plan14.map(d => renderDayCard(d, true)).join('')}
+          ${MONTH1_DAYS_15_30.map(d => renderDayCard(d, 'm1_15_30')).join('')}
         </div>
       </div>
-    ` : ''}
-
-    <div class="card-panel" style="margin-top:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-        <h3 style="margin:0">📅 สัปดาห์ 3–4 (Day 15–30): สนทนาเอาตัวรอด แต่งประโยค & สอบจบ HSK 1</h3>
+    ` : curMonth === 2 ? `
+      <div class="card-panel" style="margin-top:12px">
+        <h3 style="margin:0 0 6px">🚀 เดือนที่ 2 (Day 31–60 · HSK 2 · 300 คำ)</h3>
+        <p class="m1-muted" style="margin:0 0 14px;font-size:13px">เชื่อมประโยคเหตุผล-ขัดแย้ง (因为…所以, 虽然…但是), เปรียบเทียบ 比, กำลังทำ 正在, ประสบการณ์ 过, หาหมอ, จองโรงแรม และสั่งเดลิเวอรี</p>
+        <div class="m1-days-grid">
+          ${MONTH2_DAYS_31_60.map(d => renderDayCard(d, 'adv')).join('')}
+        </div>
       </div>
-      <div class="m1-days-grid">
-        ${MONTH1_DAYS_15_30.map(d => renderDayCard(d, false)).join('')}
+    ` : `
+      <div class="card-panel" style="margin-top:12px">
+        <h3 style="margin:0 0 6px">👑 เดือนที่ 3 (Day 61–90 · HSK 3 · 600 คำ)</h3>
+        <p class="m1-muted" style="margin:0 0 14px;font-size:13px">ปราบไวยากรณ์ระดับกลาง (ประโยค 把, ถูกกระทำ 被, ทิศทางซ้อน, คู่สับสน 或者/还是 · 刚才/刚刚 · 只要/只有) พร้อมภาษาทำงานและสอบจบ 90 วัน!</p>
+        <div class="m1-days-grid">
+          ${MONTH3_DAYS_61_90.map(d => renderDayCard(d, 'adv')).join('')}
+        </div>
       </div>
-    </div>
+    `}
   `;
+
+  body.querySelectorAll('[data-pick-month]').forEach(b => b.addEventListener('click', () => {
+    uiState.activeMonth = Number(b.dataset.pickMonth) || 1;
+    renderHomeView(core, body, rootHost, ext, stats, todayDay);
+  }));
 
   body.querySelector('#m1-start-guided')?.addEventListener('click', () => {
     renderGuidedRunner(core, body, () => renderMonth1Tab(core, rootHost), { targetDay: todayDay });

@@ -1,7 +1,9 @@
-// Pure testable logic for Month-1 Starter Pack & 95% Daily Mastery Gate
+// Pure testable logic for Month-1..3 (Day 1–90: 0 -> HSK 3) & 95% Daily Mastery Gate
 import { TONE_PAIRS, MONTH1_DAYS_15_30, HANZI_MNEMONICS, SURVIVAL_50 } from './data-month1.js';
+import { DAYS_31_90, getAdvancedDayData } from './data-months23.js';
 import { scorePronunciation, splitPinyinSyllables, stripToneAndNumber, normalizeChinese } from '../speak-studio/scoring.js';
 
+export const MAX_CURRICULUM_DAY = 90;
 export const DAILY_MASTERY_PASS_PCT = 95;
 export const EXAM_QUIZ_COUNT = 14;
 export const EXAM_SPEAK_COUNT = 3;
@@ -77,10 +79,31 @@ export function getDayMasteryRecord(dayNum, ext = {}) {
 }
 
 export function getTodayBlueprintDay(progress = {}, ext = {}) {
-  for (let d = 1; d <= 30; d++) {
+  const maxD = (ext && ext.dayMastery && typeof ext.dayMastery === 'object') ? MAX_CURRICULUM_DAY : 30;
+  for (let d = 1; d <= maxD; d++) {
     if (!isDayMastered(d, progress, ext)) return d;
   }
-  return 30;
+  return maxD;
+}
+
+export function calc90DayStats(progress = {}, ext = {}) {
+  let m1Done = 0;
+  let m2Done = 0;
+  let m3Done = 0;
+  for (let d = 1; d <= 90; d++) {
+    if (!isDayMastered(d, progress, ext)) continue;
+    if (d <= 30) m1Done++;
+    else if (d <= 60) m2Done++;
+    else m3Done++;
+  }
+  const total90Done = m1Done + m2Done + m3Done;
+  return {
+    m1Done,
+    m2Done,
+    m3Done,
+    total90Done,
+    pct90: Math.min(100, Math.round((total90Done / 90) * 100))
+  };
 }
 
 export function calcMonth1Stats(progress = {}, ext = {}) {
@@ -105,8 +128,11 @@ export function calcMonth1Stats(progress = {}, ext = {}) {
 }
 
 export function buildGuidedSession(dayNum, mistakes = []) {
-  const safeDay = Math.max(1, Math.min(30, Number(dayNum) || 1));
-  // Step 1: 3 warm-up recall items (mistakes first, then previous-day survival/mnemonic items)
+  const safeDay = Math.max(1, Math.min(MAX_CURRICULUM_DAY, Number(dayNum) || 1));
+  const advDay = safeDay >= 31 ? getAdvancedDayData(safeDay) : null;
+  const prevAdvDay = safeDay >= 32 ? getAdvancedDayData(safeDay - 1) : null;
+
+  // Step 1: 3 warm-up recall items (mistakes first, then previous-day items)
   const warmup = [];
   const seenHz = new Set();
   for (const m of (Array.isArray(mistakes) ? mistakes : [])) {
@@ -117,6 +143,15 @@ export function buildGuidedSession(dayNum, mistakes = []) {
     if (hz && th && !seenHz.has(hz)) {
       seenHz.add(hz);
       warmup.push({ hz, py, th });
+    }
+  }
+  if (prevAdvDay && Array.isArray(prevAdvDay.sentences)) {
+    for (const s of prevAdvDay.sentences) {
+      if (warmup.length >= 3) break;
+      if (!seenHz.has(s.hz)) {
+        seenHz.add(s.hz);
+        warmup.push({ hz: s.hz, py: s.py, th: s.th });
+      }
     }
   }
   let idx = 0;
@@ -133,21 +168,44 @@ export function buildGuidedSession(dayNum, mistakes = []) {
     if (idx > 60) break;
   }
 
-  // Step 2: 4 tone-pair focus items for today
+  if (advDay) {
+    const nextAdv = getAdvancedDayData(safeDay < 90 ? safeDay + 1 : 31);
+    const toneFocus = advDay.vocab.slice(0, 4).map((v, i) => ({
+      id: `d${safeDay}-v${i}`,
+      label: `${advDay.level} · คำสำคัญ`,
+      hz: v.hz,
+      py: v.py,
+      th: v.th,
+      tip: v.tip || advDay.focus
+    }));
+    const speakItems = advDay.sentences.slice(0, 5);
+    const mnemFocus = [advDay.mnem, nextAdv ? nextAdv.mnem : HANZI_MNEMONICS[0]].filter(Boolean);
+    const dayMeta = {
+      day: safeDay,
+      month: advDay.month,
+      week: advDay.week,
+      level: advDay.level,
+      title: advDay.title,
+      focus: advDay.focus
+    };
+    return { day: safeDay, meta: dayMeta, warmup, toneFocus, speakItems, mnemFocus };
+  }
+
+  // Step 2: 4 tone-pair focus items for today (Month 1)
   const pairStart = ((safeDay - 1) * 2) % TONE_PAIRS.length;
   const toneFocus = [];
   for (let i = 0; i < 4; i++) {
     toneFocus.push(TONE_PAIRS[(pairStart + i) % TONE_PAIRS.length]);
   }
 
-  // Step 3: 5 survival sentences to shadow/speak
+  // Step 3: 5 survival sentences to shadow/speak (Month 1)
   const survStart = ((safeDay - 1) * 5) % SURVIVAL_50.length;
   const speakItems = [];
   for (let i = 0; i < 5; i++) {
     speakItems.push(SURVIVAL_50[(survStart + i) % SURVIVAL_50.length]);
   }
 
-  // Mnemonic characters for today (2-3 chars per day across 64 chars)
+  // Mnemonic characters for today (2 chars per day across 64 chars)
   const mnemStart = ((safeDay - 1) * 2) % HANZI_MNEMONICS.length;
   const mnemFocus = [
     HANZI_MNEMONICS[mnemStart % HANZI_MNEMONICS.length],
@@ -175,7 +233,7 @@ const TIER2_CORE_CHARS = new Set([
  * - Day 23–30: Masks Pinyin on Tier-1 & Tier-2 core characters; keeps Pinyin on harder/new words.
  */
 export function getProgressivePinyin(hzStr, pyStr, dayNum = 1) {
-  const safeDay = Math.max(1, Math.min(30, Number(dayNum) || 1));
+  const safeDay = Math.max(1, Math.min(MAX_CURRICULUM_DAY, Number(dayNum) || 1));
   const cleanPy = String(pyStr || '').trim();
   if (!cleanPy) return '';
   if (safeDay <= 14) return cleanPy;
@@ -252,7 +310,7 @@ export function tokenizeSentenceForOrder(hzStr, pyStr = '', dayNum = 1) {
  * Passing requires >= 95% (>= 19.0 / 20 points).
  */
 export function buildDailyMasteryExam(dayNum, { planDayObj = null, mistakes = [], seed = Date.now() } = {}) {
-  const safeDay = Math.max(1, Math.min(30, Number(dayNum) || 1));
+  const safeDay = Math.max(1, Math.min(MAX_CURRICULUM_DAY, Number(dayNum) || 1));
   const rng = seededRng(seed + safeDay * 97);
   const session = buildGuidedSession(safeDay, mistakes);
   const questions = [];
@@ -638,7 +696,7 @@ export function searchDictionary(query, { vocabWords = [], lexicon = [] } = {}, 
 // ============================================================================
 import { diffDaysBetweenKeys, computeRetrievability } from '../../modules/srs-sm2.js';
 
-export const WEEKLY_BOSS_DAYS = [7, 14, 21, 30];
+export const WEEKLY_BOSS_DAYS = [7, 14, 21, 30, 37, 44, 52, 60, 67, 74, 82, 90];
 
 /**
  * Extracts all core phrases, tone pairs, and mnemonics studied on `dayNum` for automatic FSRS enrollment.
@@ -698,7 +756,7 @@ export function getDecayedDays(ext = {}, todayKey) {
   const dm = ext?.dayMastery && typeof ext.dayMastery === 'object' ? ext.dayMastery : {};
   if (!todayKey) return [];
   const decayed = [];
-  for (let d = 1; d <= 30; d++) {
+  for (let d = 1; d <= MAX_CURRICULUM_DAY; d++) {
     const rec = dm[d] || dm[String(d)];
     if (!rec || !rec.passed || Number(rec.bestPct || 0) < DAILY_MASTERY_PASS_PCT) continue;
     const passedAt = rec.passedAt || '';
@@ -771,8 +829,13 @@ export function getPendingWeeklyBoss(progress = {}, ext = {}) {
 export function buildWeeklyBossExam(checkpointDay, { planArray = [], mistakes = [], seed = Date.now() } = {}) {
   const cp = WEEKLY_BOSS_DAYS.includes(Number(checkpointDay)) ? Number(checkpointDay) : 7;
   const rng = seededRng(seed + cp * 313);
+  const startDay = cp <= 30 ? 1 : (cp <= 60 ? 31 : 61);
   const dayPool = [];
-  for (let d = 1; d <= cp; d++) dayPool.push(d);
+  for (let d = startDay; d <= cp; d++) dayPool.push(d);
+  if (startDay > 1) {
+    // Also mix in 2 anchor review days from the previous month to test long-term retention
+    dayPool.push(Math.max(1, startDay - 7), Math.max(1, startDay - 1));
+  }
   const shuffledDays = shuffleWithRng(dayPool, rng);
 
   const questions = [];
@@ -828,7 +891,7 @@ export function diagnoseWeakDaysFromBoss(missedItems = []) {
   const counts = new Map();
   for (const m of missedItems) {
     const d = Number(m?.sourceDay) || 0;
-    if (d >= 1 && d <= 30) {
+    if (d >= 1 && d <= MAX_CURRICULUM_DAY) {
       counts.set(d, (counts.get(d) || 0) + 1);
     }
   }
@@ -842,7 +905,7 @@ export function diagnoseWeakDaysFromBoss(missedItems = []) {
  */
 export function buildReflexPrompts(maxDay = 1, count = 8, seed = Date.now()) {
   const rng = seededRng(seed);
-  const safeMax = Math.max(1, Math.min(30, Number(maxDay) || 1));
+  const safeMax = Math.max(1, Math.min(MAX_CURRICULUM_DAY, Number(maxDay) || 1));
   const pool = [];
   for (let d = 1; d <= safeMax; d++) {
     const s = buildGuidedSession(d, []);

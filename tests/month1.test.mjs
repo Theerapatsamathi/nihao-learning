@@ -221,3 +221,46 @@ test('Full Mastery Suite: Quiz-FSRS grading, Memory Decay check, Weekly Boss Gat
   const weakQueue = buildWeaknessQueue({ mistakes: [{ hanzi: '谢谢', pinyin: 'xièxie', meaning: 'ขอบคุณ', misses: 3 }], maxDay: 2, count: 6, seed: 88 });
   assert.equal(weakQueue.length, 6);
 });
+
+import { MONTH2_DAYS_31_60, MONTH3_DAYS_61_90 } from '../src/features/month1/data-months23.js';
+import { calc90DayStats, WEEKLY_BOSS_DAYS } from '../src/features/month1/logic.js';
+
+test('Month 2–3 Curriculum (Day 31–90 · HSK 2 -> HSK 3): complete datasets, 95% exam, and 90-day progression', () => {
+  assert.equal(MONTH2_DAYS_31_60.length, 30);
+  assert.equal(MONTH3_DAYS_61_90.length, 30);
+  assert.equal(WEEKLY_BOSS_DAYS.length, 12);
+
+  // Every day 31..90 has 4 vocab + 5 sentences + mnemonic
+  for (const d of [...MONTH2_DAYS_31_60, ...MONTH3_DAYS_61_90]) {
+    assert.ok(d.vocab.length >= 4, `Day ${d.day} vocab`);
+    assert.equal(d.sentences.length, 5, `Day ${d.day} sentences`);
+    assert.ok(d.mnem && d.mnem.hz, `Day ${d.day} mnem`);
+  }
+
+  // Guided session & Mastery Exam work seamlessly for Day 61 (HSK 3 把 sentence)
+  const s61 = buildGuidedSession(61, []);
+  assert.equal(s61.day, 61);
+  assert.equal(s61.meta.level, 'HSK 3');
+  assert.equal(s61.toneFocus.length, 4);
+  assert.equal(s61.speakItems.length, 5);
+
+  const exam61 = buildDailyMasteryExam(61, { seed: 6161 });
+  assert.equal(exam61.questions.length, 14);
+  assert.equal(exam61.speakingPrompts.length, 3);
+
+  // Blueprint day advances from Day 30 -> Day 31 when all Month-1 days pass >=95%
+  const dm30 = {};
+  for (let d = 1; d <= 30; d++) dm30[d] = { bestPct: 95, passed: true, passedAt: '2026-11-26' };
+  assert.equal(getTodayBlueprintDay({}, { dayMastery: dm30 }), 31);
+
+  const st90 = calc90DayStats({}, { dayMastery: { ...dm30, 31: { bestPct: 100, passed: true }, 61: { bestPct: 95, passed: true } } });
+  assert.equal(st90.m1Done, 30);
+  assert.equal(st90.m2Done, 1);
+  assert.equal(st90.m3Done, 1);
+  assert.equal(st90.total90Done, 32);
+
+  // Month 2 Boss Exam (Day 60) spans Day 31..60 + anchor days
+  const boss60 = buildWeeklyBossExam(60, { seed: 6060 });
+  assert.equal(boss60.questions.length, 14);
+  assert.equal(boss60.speakingPrompts.length, 3);
+});

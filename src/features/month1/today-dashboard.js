@@ -8,6 +8,7 @@ import {
   DAILY_MASTERY_PASS_PCT,
   WEEKLY_BOSS_DAYS,
   calcMonth1Stats,
+  calc90DayStats,
   getTodayBlueprintDay,
   getDayMasteryRecord,
   getDueMonth1FsrsCards,
@@ -37,6 +38,7 @@ export function renderTodayDashboard(core, host) {
   const ext = core.getExt('month1') || {};
   const tk = core.todayKey();
   const m1Stats = calcMonth1Stats(core.state.progress, ext);
+  const stats90 = calc90DayStats(core.state.progress, ext);
   const todayDay = getTodayBlueprintDay(core.state.progress, ext);
   const dayRec = getDayMasteryRecord(todayDay, ext);
   const dueM1Fsrs = getDueMonth1FsrsCards(ext.fsrsDeck || {}, tk);
@@ -74,7 +76,7 @@ export function renderTodayDashboard(core, host) {
         <h2 style="margin:8px 0 6px">
           ${pendingBoss
             ? `ด่านสำคัญ! พิชิตสอบใหญ่บอสสะสม Day 1–${pendingBoss} ให้ถึง ${DAILY_MASTERY_PASS_PCT}%`
-            : `สวัสดี! เป้าหมายวันนี้: พิชิต Day ${todayDay} / 30 ให้ผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}%`}
+            : `สวัสดี! เป้าหมายวันนี้: พิชิต Day ${todayDay} / 90 (${todayDay <= 30 ? 'HSK 1' : (todayDay <= 60 ? 'HSK 2' : 'HSK 3')}) ให้ผ่าน ≥ ${DAILY_MASTERY_PASS_PCT}%`}
         </h2>
         <p class="m1-muted" style="margin:0 0 14px">ระบบล็อกคุณภาพครบวงจร: <b>เคลียร์การ์ด FSRS ก่อนเรียน → เรียนฝึกครบ 3 ขั้น → สอบรายวัน ≥ ${DAILY_MASTERY_PASS_PCT}% → สอบบอสสะสมทุก 7 วัน ≥ ${DAILY_MASTERY_PASS_PCT}%</b></p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -88,7 +90,7 @@ export function renderTodayDashboard(core, host) {
       </div>
       <div class="m1-kpi-mini">
         <div><strong>🔥 ${g.streak || 0}</strong><span>Streak</span></div>
-        <div><strong>${m1Stats.totalDaysDone}/30</strong><span>วันผ่าน ≥95%</span></div>
+        <div><strong>${stats90.total90Done}/90</strong><span>วันผ่าน ≥95%</span></div>
         <div><strong>${totalDueCards}</strong><span>การ์ดรอทวน</span></div>
       </div>
     </div>
