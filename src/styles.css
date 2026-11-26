@@ -922,16 +922,16 @@ button:focus-visible {
    INITIALS & ARTICULATION ANATOMY SVG
    ========================================================================== */
 .initials-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.95fr);
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.95fr) !important;
   gap: 14px;
   align-items: start;
 }
 
 #initials-groups {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 18px;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px 16px;
   align-content: start;
 }
 
@@ -1725,14 +1725,17 @@ button:focus-visible {
   }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .plan-layout,
-  .initials-layout,
   .combiner-layout,
   .writing-layout,
   .vocab-layout { grid-template-columns: minmax(0, 1fr); }
-  #initials-groups { grid-template-columns: minmax(0, 1fr); }
   .plan-sidebar { max-height: 280px; }
-  .inspector-sticky { position: static; }
   .drill-selector { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .initials-layout,
+  #initials-groups { grid-template-columns: minmax(0, 1fr) !important; }
+  .inspector-sticky { position: static; }
 }
 
 @media (max-width: 600px) {
