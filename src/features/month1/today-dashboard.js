@@ -29,6 +29,7 @@ import {
 import { realWorldProgress } from './realworld-logic.js';
 import { openQuickDict } from './quick-dict.js';
 import { isLargeHanziEnabled, setLargeHanziEnabled } from './ux-utils.js';
+import { renderToneCoachRunner } from './tone-coach.js';
 
 let activeHubSection = 'practice'; // 'practice' | 'realworld' | 'tools'
 
@@ -102,6 +103,7 @@ export function renderTodayDashboard(core, host) {
         <p class="m1-muted" style="margin:0 0 14px">${core.escapeHtml(heroSub)}</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <button type="button" class="btn-primary ux-primary-cta" id="td-start-15m">${core.escapeHtml(primaryBtnLabel)}</button>
+          <button type="button" class="btn-secondary" id="td-go-tone-coach">📈 โค้ชตรวจการออกเสียง</button>
           <button type="button" class="btn-secondary" id="td-open-dict">🔍 ค้นศัพท์ (/)</button>
           <button type="button" class="btn-secondary" id="td-go-month1">🗺️ แผน 90 วัน</button>
         </div>
@@ -151,6 +153,13 @@ export function renderTodayDashboard(core, host) {
     ${activeHubSection === 'practice' ? `
       <div class="card-panel">
         <div class="m1-days-grid" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))">
+          <div class="m1-day-card">
+            <span class="m1-tag">📈 Tone Pitch Coach</span>
+            <div style="font-weight:700;margin:6px 0 4px">กราฟวรรณยุกต์สด + โค้ชแก้สำเนียง</div>
+            <div class="m1-muted" style="font-size:12px;margin-bottom:10px">วาดเส้นเสียงทับเจ้าของภาษา พร้อมแนะนำตำแหน่งลิ้น พ่นลม และกฎผันเสียงละเอียด</div>
+            <button type="button" class="btn-primary m1-mini-btn" id="td-go-tone-coach-card">📈 เปิดโค้ชตรวจเสียง →</button>
+          </div>
+
           <div class="m1-day-card">
             <span class="m1-tag">⚡ Reflex 4s</span>
             <div style="font-weight:700;margin:6px 0 4px">พูดสวนกลับไวใน 4 วินาที</div>
@@ -298,6 +307,8 @@ export function renderTodayDashboard(core, host) {
   host.querySelector('#td-rw-street')?.addEventListener('click', () => renderStreetListeningRunner(core, host, redrawSelf));
   host.querySelector('#td-rw-pattern')?.addEventListener('click', () => renderPatternWorkshopRunner(core, host, redrawSelf));
   host.querySelector('#td-rw-blind')?.addEventListener('click', () => renderBlindDictationRunner(core, host, redrawSelf));
+  host.querySelector('#td-go-tone-coach')?.addEventListener('click', () => renderToneCoachRunner(core, host, redrawSelf));
+  host.querySelector('#td-go-tone-coach-card')?.addEventListener('click', () => renderToneCoachRunner(core, host, redrawSelf));
   host.querySelector('#td-go-reflex')?.addEventListener('click', () => renderReflexSpeakingRunner(core, host, redrawSelf));
   host.querySelector('#td-go-weakness')?.addEventListener('click', () => renderWeaknessGrinder(core, host, redrawSelf));
   host.querySelectorAll('[data-boss-cp]').forEach(b => b.addEventListener('click', () => {
