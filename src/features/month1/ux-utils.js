@@ -208,4 +208,30 @@ export function initUxEnhancements(core) {
     });
     window.__nihaoToneObserver.observe(document.body, { childList: true, subtree: true });
   }
+
+  // 4. Real Idle-Aware Active Study Time Tracker (only counts when tab visible & active within 60s)
+  if (!window.__nihaoActiveTimer && core && typeof core.setExt === 'function') {
+    let lastInteraction = Date.now();
+    let activeSec = 0;
+    const markActive = () => { lastInteraction = Date.now(); };
+    ['pointerdown', 'keydown', 'touchstart'].forEach(ev => {
+      document.addEventListener(ev, markActive, { passive: true });
+    });
+    window.__nihaoActiveTimer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastInteraction > 60000) return; // idle > 60s -> pause
+      activeSec += 5;
+      if (activeSec >= 60) {
+        activeSec -= 60;
+        const tk = core.todayKey?.();
+        if (!tk) return;
+        core.setExt('month1', (cur) => {
+          const sl = { ...(cur.studyLog || {}) };
+          const prev = Number(sl[tk]?.minutes) || 0;
+          sl[tk] = { ...(sl[tk] || {}), minutes: prev + 1, updatedAt: Date.now() };
+          return { ...cur, studyLog: sl };
+        }, { save: true });
+      }
+    }, 5000);
+  }
 }

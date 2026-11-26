@@ -46,8 +46,10 @@ export function buildStudyCalendar(progress = {}, ext = {}, todayKey = '2026-01-
     const actCount = Number(act[dk]) || 0;
     const logMin = Number(studyLog[dk]?.minutes) || 0;
     const passed = passedByDate.get(dk) || [];
-    // Estimate minutes cleanly when explicit log isn't present: ~15m per passed day + ~4m per activity tick
-    const minutes = logMin > 0 ? logMin : (passed.length * 15 + actCount * 4);
+    // Prefer real idle-aware studyLog minutes; fallback to realistic capped estimate for legacy days
+    const minutes = logMin > 0
+      ? logMin
+      : Math.min(60, passed.length * 10 + Math.min(20, Math.round(actCount * 0.5)));
     const level = minutes === 0 ? 0 : minutes < 15 ? 1 : minutes < 35 ? 2 : minutes < 60 ? 3 : 4;
 
     if (offset === 0) todayMin = minutes;

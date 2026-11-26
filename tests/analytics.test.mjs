@@ -10,7 +10,10 @@ import {
 test('buildStudyCalendar builds 84-day grid and aggregates passed days & hours', () => {
   const cal = buildStudyCalendar(
     { activity: { '2026-11-26': 3 } },
-    { dayMastery: { 1: { passed: true, bestPct: 95, passedAt: '2026-11-26' } } },
+    {
+      dayMastery: { 1: { passed: true, bestPct: 95, passedAt: '2026-11-26' } },
+      studyLog: { '2026-11-26': { minutes: 12 } }
+    },
     '2026-11-26',
     84
   );
@@ -18,8 +21,8 @@ test('buildStudyCalendar builds 84-day grid and aggregates passed days & hours',
   const today = cal.cells[cal.cells.length - 1];
   assert.equal(today.dateKey, '2026-11-26');
   assert.equal(today.passedDays.length, 1);
-  assert.ok(today.minutes >= 15);
-  assert.ok(cal.summary.todayMin >= 15);
+  assert.equal(today.minutes, 12);
+  assert.equal(cal.summary.todayMin, 12);
 });
 
 test('computeSkillStrengthsWeaknesses returns 4 skills, strength, weakness, and nemesis words', () => {
