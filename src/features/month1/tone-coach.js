@@ -3,6 +3,7 @@ import { detectPitchYIN, splitPinyinSyllables, stripToneAndNumber, idealToneCont
 import { hasSpeechRecognition, startSpeechRecognition, getCharPinyinMap } from '../speak-studio/speech.js';
 import { TONE_COACH_PACKS, buildDetailedPronunciationReport } from './tone-coach-logic.js';
 import { colorizePinyin, renderMicWaveHtml } from './ux-utils.js';
+import { getSavedGeminiKey } from './live-voice-call.js';
 
 function drawContourCanvas(canvas, idealCurve = [], userCurve = [], livePitchNorm = []) {
   if (!canvas) return;
@@ -82,6 +83,9 @@ export function renderToneCoachRunner(core, host, onExit) {
   let lastReport = null;
   let lastHeard = '';
   let lastAudioUrl = null;
+  let lastAudioBlob = null;
+  let aiCoachLoading = false;
+  let aiCoachText = '';
   let liveRawHz = [];
   let activeMic = null;
   let audioCtx = null;
@@ -157,8 +161,16 @@ export function renderToneCoachRunner(core, host, onExit) {
             </button>
             ${renderMicWaveHtml(recording)}
             ${lastAudioUrl ? `<button type="button" class="btn-secondary" id="tc-play-me">▶️ ฟังเสียงตัวเอง</button>` : ''}
+            ${lastAudioBlob ? `<button type="button" class="btn-primary m1-ai-btn" id="tc-ai-coach" ${aiCoachLoading ? 'disabled' : ''}>${aiCoachLoading ? '⏳ ครู Gemini กำลังฟัง...' : '🤖 ให้ครู Gemini ฟังเสียงจริง'}</button>` : ''}
           </div>
         </div>
+
+        ${aiCoachText ? `
+          <div class="card-panel m1-ai-grade-panel">
+            <div style="font-weight:700;margin-bottom:6px">🤖 คอมเมนต์จากครู Gemini (ฟังจากเสียงจริงของคุณ)</div>
+            <div style="white-space:pre-line;font-size:13.5px;line-height:1.6">${core.escapeHtml(aiCoachText)}</div>
+          </div>
+        ` : ''}
 
         ${lastReport ? `
           <div class="card-panel" style="background:var(--sys-fill-3,rgba(120,120,128,.06));margin-bottom:12px">
@@ -233,6 +245,50 @@ export function renderToneCoachRunner(core, host, onExit) {
     host.querySelector('#tc-play-me')?.addEventListener('click', () => {
       if (lastAudioUrl) new Audio(lastAudioUrl).play().catch(() => {});
     });
+    host.querySelector('#tc-ai-coach')?.addEventListener('click', async () => {
+      const apiKey = getSavedGeminiKey();
+      if (!apiKey) {
+        core.showToast('กรุณากรอก Gemini API Key ในหน้า "📞 โทรคุยสดครูจีน AI" ก่อนครับ');
+        return;
+      }
+      if (!lastAudioBlob) return;
+      aiCoachLoading = true;
+      aiCoachText = '';
+      render();
+      try {
+        const b64 = await new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(String(fr.result || '').split(',')[1] || '');
+          fr.onerror = reject;
+          fr.readAsDataURL(lastAudioBlob);
+        });
+        const prompt = `คุณคือครูสอนออกเสียงภาษาจีนกลางสำหรับคนไทย ผู้เรียนเพิ่งพูดประโยค: "${item.hz}" (${item.py} - ${item.th})
+ช่วยฟังเสียงจริงที่แนบมา แล้ววิเคราะห์เป็นภาษาไทยแบบละเอียดแต่กระชับ:
+1. คะแนนความเหมือนเจ้าของภาษา (0-100%)
+2. จุดที่ออกเสียงดีแล้ว
+3. จุดที่ต้องแก้แยกทีละพยางค์ (วรรณยุกต์ / พยัญชนะ / สระ / จังหวะ)
+4. ทริคฝึกให้เป๊ะทันทีใน 1 นาที`;
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: prompt },
+                { inline_data: { mime_type: lastAudioBlob.type || 'audio/webm', data: b64 } }
+              ]
+            }]
+          })
+        });
+        const data = await res.json();
+        aiCoachText = data?.candidates?.[0]?.content?.parts?.[0]?.text || (data?.error?.message ? `⚠️ ${data.error.message}` : 'ไม่สามารถวิเคราะห์เสียงได้ ลองใหม่อีกครั้งครับ');
+      } catch (e) {
+        aiCoachText = `⚠️ เกิดข้อผิดพลาด: ${e?.message || 'เชื่อมต่อ Gemini ไม่สำเร็จ'}`;
+      } finally {
+        aiCoachLoading = false;
+        render();
+      }
+    });
     host.querySelector('#tc-custom-go')?.addEventListener('click', () => {
       const hz = host.querySelector('#tc-custom-hz')?.value?.trim();
       const py = host.querySelector('#tc-custom-py')?.value?.trim();
@@ -280,7 +336,8 @@ export function renderToneCoachRunner(core, host, onExit) {
           mediaRecorder.onstop = () => {
             if (chunks.length) {
               if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl);
-              lastAudioUrl = URL.createObjectURL(new Blob(chunks, { type: 'audio/webm' }));
+              lastAudioBlob = new Blob(chunks, { type: 'audio/webm' });
+              lastAudioUrl = URL.createObjectURL(lastAudioBlob);
             }
           };
           mediaRecorder.start();

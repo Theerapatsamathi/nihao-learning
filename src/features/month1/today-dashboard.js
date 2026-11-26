@@ -30,6 +30,7 @@ import { realWorldProgress } from './realworld-logic.js';
 import { openQuickDict } from './quick-dict.js';
 import { isLargeHanziEnabled, setLargeHanziEnabled } from './ux-utils.js';
 import { renderToneCoachRunner } from './tone-coach.js';
+import { renderLiveVoiceCallRunner } from './live-voice-call.js';
 
 let activeHubSection = 'practice'; // 'practice' | 'realworld' | 'tools'
 
@@ -103,9 +104,9 @@ export function renderTodayDashboard(core, host) {
         <p class="m1-muted" style="margin:0 0 14px">${core.escapeHtml(heroSub)}</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <button type="button" class="btn-primary ux-primary-cta" id="td-start-15m">${core.escapeHtml(primaryBtnLabel)}</button>
+          <button type="button" class="btn-secondary m1-ai-btn" id="td-go-live-call">📞 โทรคุยสดครูจีน AI</button>
           <button type="button" class="btn-secondary" id="td-go-tone-coach">📈 โค้ชตรวจการออกเสียง</button>
           <button type="button" class="btn-secondary" id="td-open-dict">🔍 ค้นศัพท์ (/)</button>
-          <button type="button" class="btn-secondary" id="td-go-month1">🗺️ แผน 90 วัน</button>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
           <label class="m1-toggle-chip">
@@ -307,6 +308,7 @@ export function renderTodayDashboard(core, host) {
   host.querySelector('#td-rw-street')?.addEventListener('click', () => renderStreetListeningRunner(core, host, redrawSelf));
   host.querySelector('#td-rw-pattern')?.addEventListener('click', () => renderPatternWorkshopRunner(core, host, redrawSelf));
   host.querySelector('#td-rw-blind')?.addEventListener('click', () => renderBlindDictationRunner(core, host, redrawSelf));
+  host.querySelector('#td-go-live-call')?.addEventListener('click', () => renderLiveVoiceCallRunner(core, host, redrawSelf));
   host.querySelector('#td-go-tone-coach')?.addEventListener('click', () => renderToneCoachRunner(core, host, redrawSelf));
   host.querySelector('#td-go-tone-coach-card')?.addEventListener('click', () => renderToneCoachRunner(core, host, redrawSelf));
   host.querySelector('#td-go-reflex')?.addEventListener('click', () => renderReflexSpeakingRunner(core, host, redrawSelf));
