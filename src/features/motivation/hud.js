@@ -102,14 +102,49 @@ export function initMotivationHud(core, { openSubTab }) {
   const hudEl = document.createElement('div');
   hudEl.className = 'mo-hud';
   hudEl.setAttribute('aria-live', 'polite');
+  hudEl.style.display = 'none';
   hudEl.innerHTML = `
-    <button type="button" class="mo-hud-pill mo-hud-hearts" hidden aria-label="หัวใจคงเหลือ"></button>
-    <div class="mo-hud-pill mo-hud-combo" hidden></div>
+    <button type="button" class="mo-hud-pill mo-hud-hearts" hidden style="display: none !important;" aria-label="หัวใจคงเหลือ"></button>
+    <div class="mo-hud-pill mo-hud-combo" hidden style="display: none !important;"></div>
   `;
   document.body.appendChild(hudEl);
 
   const heartsPill = hudEl.querySelector('.mo-hud-hearts');
   const comboPill = hudEl.querySelector('.mo-hud-combo');
+
+  function updateHudVisibility() {
+    const showHearts = Boolean(heartsPill && !heartsPill.hidden && heartsPill.style.display !== 'none' && heartsPill.innerHTML.trim());
+    const showCombo = Boolean(comboPill && !comboPill.hidden && comboPill.style.display !== 'none' && comboPill.innerHTML.trim());
+    hudEl.style.display = (showHearts || showCombo) ? 'flex' : 'none';
+  }
+  comboPill.style.cursor = 'pointer';
+  comboPill.setAttribute('role', 'status');
+  comboPill.setAttribute('title', 'คอมโบตอบถูกต่อเนื่อง (แตะเพื่อดูรายละเอียด · รีเซ็ตอัตโนมัติเมื่อหยุดพัก)');
+  comboPill.addEventListener('click', () => {
+    if (combo >= 2) {
+      const bonus = computeComboBonus(combo);
+      core.showToast(`🔥 สตรีคคอมโบตอบถูก ${combo} ข้อติด! (โบนัสคูณ XP x${bonus.multiplier})`, 0);
+    }
+  });
+
+  let comboTimer = null;
+  function resetComboTimer() {
+    if (comboTimer) clearTimeout(comboTimer);
+    comboTimer = setTimeout(() => {
+      if (combo > 0) {
+        combo = 0;
+        updateComboHud();
+      }
+    }, 20000); // Auto-expire after 20s of quiz inactivity
+  }
+
+  core.on?.('tab', () => {
+    if (comboTimer) clearTimeout(comboTimer);
+    if (combo > 0) {
+      combo = 0;
+      updateComboHud();
+    }
+  });
 
   heartsPill.addEventListener('click', () => {
     openSubTab('goals');
@@ -121,6 +156,9 @@ export function initMotivationHud(core, { openSubTab }) {
     const h = computeHeartsState(ext.hearts || {}, Date.now());
     if (!h.enabled) {
       heartsPill.hidden = true;
+      heartsPill.style.display = 'none';
+      heartsPill.innerHTML = '';
+      updateHudVisibility();
       return h;
     }
     if (ext.hearts && h.count !== ext.hearts.count) {
@@ -130,18 +168,24 @@ export function initMotivationHud(core, { openSubTab }) {
       }), { save: false });
     }
     heartsPill.hidden = false;
+    heartsPill.style.display = '';
     heartsPill.innerHTML = `<span class="mo-heart-icon">❤️</span><span>${h.count}/${MAX_HEARTS}</span>`;
     heartsPill.classList.toggle('mo-hud-low', h.count <= 1);
+    updateHudVisibility();
     return h;
   }
 
   function updateComboHud() {
     if (combo < 2) {
       comboPill.hidden = true;
+      comboPill.style.display = 'none';
+      comboPill.innerHTML = '';
+      updateHudVisibility();
       return;
     }
     const bonus = computeComboBonus(combo);
     comboPill.hidden = false;
+    comboPill.style.display = '';
     comboPill.classList.toggle('mo-combo-hot', combo >= 5);
     comboPill.classList.toggle('mo-combo-fire', combo >= 10);
     comboPill.innerHTML = `
@@ -149,6 +193,7 @@ export function initMotivationHud(core, { openSubTab }) {
       <span>${combo}</span>
       ${bonus.multiplier > 1 ? `<span class="mo-combo-mult">x${bonus.multiplier}</span>` : ''}
     `;
+    updateHudVisibility();
   }
 
   function showZeroHeartsModal() {
@@ -198,7 +243,9 @@ export function initMotivationHud(core, { openSubTab }) {
         core.showToast(`🔥 คอมโบ ${combo} ข้อติด! ${bonus.label}`, bonus.bonusXp);
       }
       updateComboHud();
+      resetComboTimer();
     } else {
+      if (comboTimer) clearTimeout(comboTimer);
       combo = 0;
       updateComboHud();
       const ext = core.getExt('motivation') || {};
@@ -274,12 +321,15 @@ export function initMotivationHud(core, { openSubTab }) {
   // Initial paint
   updateHeaderRing();
   updateHeartsHud();
+  updateComboHud();
+  updateHudVisibility();
 
   return {
     refresh() {
       updateHeaderRing();
       updateHeartsHud();
       updateComboHud();
+      updateHudVisibility();
     },
     getCombo: () => combo
   };

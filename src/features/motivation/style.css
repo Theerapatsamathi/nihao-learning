@@ -583,6 +583,12 @@
   pointer-events: none;
 }
 
+.mo-hud[style*="display: none"],
+.mo-hud:empty,
+.mo-hud:not(:has(.mo-hud-pill:not([hidden]):not(:empty))) {
+  display: none !important;
+}
+
 .mo-hud-pill {
   pointer-events: auto;
   display: inline-flex;
@@ -596,6 +602,16 @@
   box-shadow: var(--sys-shadow-2);
   font-weight: 700;
   font-size: 0.88rem;
+}
+
+.mo-hud-pill[hidden],
+.mo-hud-pill:empty,
+.mo-hud-hearts[hidden],
+.mo-hud-combo[hidden] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 .mo-hud-hearts { cursor: pointer; }

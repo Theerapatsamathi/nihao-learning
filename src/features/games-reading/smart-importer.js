@@ -327,7 +327,7 @@ export function renderSmartImporterSection(core, host) {
     host.querySelector('#gr-imp-analyze')?.addEventListener('click', () => {
       state.rawText = host.querySelector('#gr-imp-text')?.value || '';
       state.title = 'บทเรียนที่นำเข้าเอง';
-      core.playChime('ok');
+      core.playChime('ok', true);
       draw();
     });
 

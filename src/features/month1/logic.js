@@ -5,7 +5,7 @@ export function stripTones(str) {
   return String(str || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ü/gi, 'u')
+    .replace(/[üv]/gi, 'u')
     .toLowerCase()
     .trim();
 }

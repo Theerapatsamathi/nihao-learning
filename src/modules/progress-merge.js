@@ -68,7 +68,61 @@ export function mergeCloudProgressData(localP, cloudP) {
     (x) => (Number(x.reps || 0) * 10) + Number(x.interval || 0)
   );
 
-  merged.vocabNotes = { ...(localP.vocabNotes || {}), ...(cloudP.vocabNotes || {}) };
+  merged.vocabNotes = { ...(localP.vocabNotes || {}) };
+  for (const [k, v] of Object.entries(cloudP.vocabNotes || {})) {
+    if (!merged.vocabNotes[k] || (v && String(v).trim().length > String(merged.vocabNotes[k]).trim().length)) {
+      merged.vocabNotes[k] = v;
+    }
+  }
+
+  // Merge completed day lesson blocks (dayChecks: { [day]: [blockIds] })
+  const mergedDayChecks = { ...(localP.dayChecks || {}) };
+  for (const [day, arr] of Object.entries(cloudP.dayChecks || {})) {
+    const localArr = Array.isArray(mergedDayChecks[day]) ? mergedDayChecks[day] : [];
+    const cloudArr = Array.isArray(arr) ? arr : [];
+    mergedDayChecks[day] = uniqArr(localArr, cloudArr);
+  }
+  merged.dayChecks = mergedDayChecks;
+
+  // Mistakes & Vocab Mistakes deduplication by item ID
+  const mergeMistakes = (listA, listB) => {
+    const map = new Map();
+    for (const m of (Array.isArray(listA) ? listA : [])) {
+      if (m?.id) map.set(m.id, { ...m });
+    }
+    for (const m of (Array.isArray(listB) ? listB : [])) {
+      if (m?.id) {
+        const prev = map.get(m.id);
+        if (prev) {
+          prev.misses = Math.max(prev.misses || 1, m.misses || 1);
+        } else {
+          map.set(m.id, { ...m });
+        }
+      }
+    }
+    return Array.from(map.values()).slice(-40);
+  };
+  merged.mistakes = mergeMistakes(localP.mistakes, cloudP.mistakes);
+  merged.vocabMistakes = mergeMistakes(localP.vocabMistakes, cloudP.vocabMistakes);
+
+  merged.spentCoins = Math.max(localP.spentCoins || 0, cloudP.spentCoins || 0);
+  merged.vocabGoal = Math.max(localP.vocabGoal || 100, cloudP.vocabGoal || 100);
+  merged.vocabMilestones = { ...(localP.vocabMilestones || {}), ...(cloudP.vocabMilestones || {}) };
+  merged.equipped = { ...(localP.equipped || {}), ...(cloudP.equipped || {}) };
+
+  // Daily quest state: keep highest counts if same day
+  if (localP.daily && cloudP.daily && localP.daily.date === cloudP.daily.date) {
+    merged.daily = {
+      date: localP.daily.date,
+      drills: Math.max(localP.daily.drills || 0, cloudP.daily.drills || 0),
+      writes: Math.max(localP.daily.writes || 0, cloudP.daily.writes || 0),
+      srs: Math.max(localP.daily.srs || 0, cloudP.daily.srs || 0),
+      claimed: uniqArr(localP.daily.claimed, cloudP.daily.claimed)
+    };
+  } else {
+    merged.daily = cloudP.daily || localP.daily || null;
+  }
+
   merged.dayScores = mergeMaxNumMap(localP.dayScores, cloudP.dayScores);
   merged.activity = mergeMaxNumMap(localP.activity, cloudP.activity);
   merged.bonusXp = Math.max(localP.bonusXp || 0, cloudP.bonusXp || 0);

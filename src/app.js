@@ -42,8 +42,11 @@ if (typeof window !== 'undefined') {
 
   function todayKey(offsetDays = 0) {
     const d = new Date();
-    d.setDate(d.getDate() + offsetDays);
-    return d.toISOString().slice(0, 10);
+    if (offsetDays !== 0) d.setDate(d.getDate() + offsetDays);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   // ---- Web Audio Micro-Chimes & Floating XP Toast ----
@@ -608,16 +611,31 @@ if (typeof window !== 'undefined') {
       (p.bonusXp || 0) +
       (bossPassed ? 500 : (p.bestQuiz || 0) * 20);
 
-    // Auto-apply Streak Freeze if user missed yesterday but had an active streak before
+    // Auto-apply Streak Freeze: supports multi-day missed gap if user has enough freezes
     if (!Array.isArray(p.frozenDays)) p.frozenDays = [];
-    const yesterday = todayKey(-1);
-    const twoDaysAgo = todayKey(-2);
-    const hadYesterday = (p.activity[yesterday] || 0) > 0 || p.frozenDays.includes(yesterday);
-    const hadBefore = (p.activity[twoDaysAgo] || 0) > 0 || p.frozenDays.includes(twoDaysAgo);
-    if (!hadYesterday && hadBefore && (p.streakFreezes || 0) > 0) {
-      p.streakFreezes -= 1;
-      p.frozenDays.push(yesterday);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch { /* ignore */ }
+    const availableFreezes = p.streakFreezes || 0;
+    if (availableFreezes > 0) {
+      const missedGap = [];
+      let foundAnchor = false;
+      for (let i = 1; i <= availableFreezes + 1; i++) {
+        const k = todayKey(-i);
+        const isActive = (p.activity[k] || 0) > 0 || p.frozenDays.includes(k);
+        if (isActive) {
+          foundAnchor = true;
+          break;
+        } else {
+          missedGap.push(k);
+        }
+      }
+      if (foundAnchor && missedGap.length > 0 && missedGap.length <= availableFreezes) {
+        for (const k of missedGap) {
+          if (!p.frozenDays.includes(k)) {
+            p.frozenDays.push(k);
+            p.streakFreezes -= 1;
+          }
+        }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch { /* ignore */ }
+      }
     }
 
     // Compute consecutive daily streak (counting frozen days)
@@ -2039,7 +2057,11 @@ if (typeof window !== 'undefined') {
   let vocabIndexCache = null;
 
   function stripToneMarks(str) {
-    return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return String(str || '')
+      .replace(/[üǖǘǚǜ]/gi, 'v')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
   }
 
   function getVocabIndex() {
@@ -2436,7 +2458,7 @@ if (typeof window !== 'undefined') {
         if (idx === -1) {
           list.push(id);
           btn.classList.add('starred');
-          playChime('ok');
+          playChime('ok', true);
         } else {
           list.splice(idx, 1);
           btn.classList.remove('starred');
@@ -2472,7 +2494,7 @@ if (typeof window !== 'undefined') {
           if (card) card.classList.add('is-learned');
           btn.classList.add('checked');
           btn.textContent = state.vocabViewMode === 'list' ? '✓ วันนี้' : '✓ สะสมวันนี้แล้ว';
-          playChime('ok');
+          playChime('ok', true);
           const milestoneMsg = checkVocabMilestones(getVocabTodayCount());
           saveProgress(milestoneMsg);
         }
@@ -2937,7 +2959,7 @@ if (typeof window !== 'undefined') {
             syncVocabSrsOnLearn(w.id, tkNow);
           }
         });
-        playChime('ok');
+        playChime('ok', true);
         const milestoneMsg = checkVocabMilestones(getVocabTodayCount());
         saveProgress(milestoneMsg || `สะสมครบ ${items.length} คำในชุดนี้แล้ว!`);
       }
@@ -3762,7 +3784,7 @@ if (typeof window !== 'undefined') {
     document.getElementById('vb-modal-star')?.addEventListener('click', () => {
       const list = state.progress.vocabStarred || (state.progress.vocabStarred = []);
       const idx = list.indexOf(word.id);
-      if (idx === -1) { list.push(word.id); playChime('ok'); }
+      if (idx === -1) { list.push(word.id); playChime('ok', true); }
       else { list.splice(idx, 1); }
       saveProgress();
       openVocabDetailModal(word.id);
@@ -3775,7 +3797,7 @@ if (typeof window !== 'undefined') {
       if (val) notes[word.id] = val;
       else delete notes[word.id];
       saveProgress('บันทึกโน้ตช่วยจำแล้ว');
-      playChime('ok');
+      playChime('ok', true);
       if (state.vocabMode === 'bank') renderVocabBankResults();
     });
 
@@ -3844,7 +3866,7 @@ if (typeof window !== 'undefined') {
       } else {
         map[word.id] = tkNow;
         syncVocabSrsOnLearn(word.id, tkNow);
-        playChime('ok');
+        playChime('ok', true);
         const msg = checkVocabMilestones(getVocabTodayCount());
         saveProgress(msg);
       }
@@ -3859,8 +3881,9 @@ if (typeof window !== 'undefined') {
   const SRS_INTERVALS = [1, 3, 7, 14, 30];
 
   function addDaysToKey(dateStr, days) {
-    const d = new Date(dateStr + 'T00:00:00');
-    d.setDate(d.getDate() + days);
+    const parts = String(dateStr || '').split('-').map(Number);
+    if (parts.length !== 3 || parts.some(n => Number.isNaN(n))) return dateStr;
+    const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + Math.max(0, Math.round(days))));
     return d.toISOString().slice(0, 10);
   }
 
@@ -4042,9 +4065,10 @@ if (typeof window !== 'undefined') {
         const nextEntry = computeNextFsrs(srsMap[activeWord.id], rate, tk);
         if (rate === 'again') {
           sess.queue.push(activeWord); // re-queue in current session
+        } else {
+          state.progress.bonusXp = (state.progress.bonusXp || 0) + 4;
         }
         srsMap[activeWord.id] = nextEntry;
-        state.progress.bonusXp = (state.progress.bonusXp || 0) + 4;
         sess.doneCount++;
         sess.idx++;
         sess.flipped = false;
@@ -6049,7 +6073,7 @@ if (typeof window !== 'undefined') {
       btn.addEventListener('click', () => {
         const q = ENG.dailyQuests.find(x => x.id === btn.dataset.claimQuest);
         const d = ensureTodayDaily(state.progress);
-        if (!q || d.claimed.includes(q.id)) return;
+        if (!q || d.claimed.includes(q.id) || (d[q.metric] || 0) < q.target) return;
         d.claimed.push(q.id);
         state.progress.bonusXp = (state.progress.bonusXp || 0) + q.xp;
         saveProgress(`ภารกิจสำเร็จ: ${q.title}`);
@@ -6075,7 +6099,7 @@ if (typeof window !== 'undefined') {
       if (curFreezes >= maxFreezes || coins < freezeCost) return;
       state.progress.spentCoins = (state.progress.spentCoins || 0) + freezeCost;
       state.progress.streakFreezes = curFreezes + 1;
-      playChime('ok');
+      playChime('ok', true);
       saveProgress('ซื้อตั๋วกันสตรีคขาด ❄️ (+1 ใบ)');
       renderProfilePage();
     });
@@ -6105,7 +6129,7 @@ if (typeof window !== 'undefined') {
         else state.progress.equipped[item.slot] = item.id;
         saveProgress();
         renderPandaSprite(g.level);
-        playChime('ok');
+        playChime('ok', true);
         renderProfilePage();
       });
     });
@@ -6267,7 +6291,7 @@ if (typeof window !== 'undefined') {
     a.href = canvas.toDataURL('image/png');
     a.download = `nihao-level1-certificate-${todayKey()}.png`;
     a.click();
-    playChime('ok');
+    playChime('ok', true);
     showToast('ดาวน์โหลดการ์ด .PNG เรียบร้อยแล้ว', 'CERT');
   }
 
@@ -6547,7 +6571,7 @@ if (typeof window !== 'undefined') {
         if (idx === -1) {
           list.push(id);
           btn.classList.add('starred');
-          playChime('ok');
+          playChime('ok', true);
         } else {
           list.splice(idx, 1);
           btn.classList.remove('starred');
@@ -8280,7 +8304,7 @@ if (typeof window !== 'undefined') {
     actor.classList.add('jumping');
     setTimeout(() => actor.classList.remove('jumping'), 1150);
     pandaSay(pick.label, 2800);
-    playChime('ok');
+    playChime('ok', true);
     speak(pick.zh);
   });
 
@@ -8350,7 +8374,7 @@ if (typeof window !== 'undefined') {
     sfxEnabled = !sfxEnabled;
     try { localStorage.setItem('nihao-sfx', sfxEnabled ? 'on' : 'off'); } catch {}
     syncSfxIcon();
-    if (sfxEnabled) playChime('ok');
+    if (sfxEnabled) playChime('ok', true);
   });
 
   document.querySelectorAll('#srs-mode-switch button').forEach(btn => {
@@ -8540,8 +8564,11 @@ if (typeof window !== 'undefined') {
     getExt,
     setExt,
     registerTab: registerFeatureTab,
-    isSignedIn: () => Boolean(authState.user),
-    getUser: () => authState.user,
+    isSignedIn: () => isUserSignedIn(),
+    getUser: () => getActiveUser(),
+    pullCloudProgress: (silent = true) => pullCloudProgress(silent),
+    pushCloudProgress: (silent = true) => pushCloudProgress(silent),
+    mergeCloudProgress: (localP, cloudP) => mergeCloudProgress(localP, cloudP),
     openAuthModal: () => openAuthModal(),
     get aiStatus() { return state.aiStatus; },
     on(name, fn) { const h = (e) => fn(e.detail || {}); coreBus.addEventListener(name, h); return () => coreBus.removeEventListener(name, h); },
@@ -8568,15 +8595,34 @@ if (typeof window !== 'undefined') {
     .then(() => emitCore('features-ready', {}))
     .catch(err => console.error('[features] failed to load', err));
 
-  // ---- NETLIFY IDENTITY + POSTGRES CLOUD SYNC ----
+  // ---- NETLIFY IDENTITY / FIREBASE GOOGLE AUTH + CLOUD SYNC ----
+
+  function getActiveUser() {
+    if (authState.user) return authState.user;
+    if (window.__nihaoFirebaseUser) {
+      return {
+        id: `fb:${window.__nihaoFirebaseUser.uid}`,
+        email: window.__nihaoFirebaseUser.email || '',
+        user_metadata: {
+          full_name: window.__nihaoFirebaseUser.displayName || window.__nihaoFirebaseUser.email?.split('@')[0] || 'Learner'
+        }
+      };
+    }
+    return null;
+  }
+
+  function isUserSignedIn() {
+    return Boolean(getActiveUser());
+  }
 
   function updateAuthButton() {
     const label = document.getElementById('header-auth-label');
     const dot = document.getElementById('header-auth-dot');
     const btn = document.getElementById('header-auth-btn');
     if (!label || !dot || !btn) return;
-    if (authState.user) {
-      const name = authState.user.user_metadata?.full_name || authState.user.email?.split('@')[0] || 'บัญชีของฉัน';
+    const u = getActiveUser();
+    if (u) {
+      const name = u.user_metadata?.full_name || u.email?.split('@')[0] || 'บัญชีของฉัน';
       label.textContent = authState.syncing ? `${name} · ซิงก์...` : name;
       dot.classList.add('online');
       btn.classList.add('signed-in');
@@ -8602,7 +8648,7 @@ if (typeof window !== 'undefined') {
   }
 
   async function pushCloudProgress(silent = true) {
-    if (!authState.user || !isCloudAuthOrigin()) return;
+    if (!isUserSignedIn() || !isCloudAuthOrigin()) return;
     authState.syncing = true;
     updateAuthButton();
     try {
@@ -8628,7 +8674,7 @@ if (typeof window !== 'undefined') {
   }
 
   function scheduleCloudSync() {
-    if (!authState.user || !isCloudAuthOrigin()) return;
+    if (!isUserSignedIn() || !isCloudAuthOrigin()) return;
     if (authState.syncTimer) clearTimeout(authState.syncTimer);
     authState.syncTimer = setTimeout(() => {
       authState.syncTimer = null;
@@ -8636,8 +8682,8 @@ if (typeof window !== 'undefined') {
     }, 1200);
   }
 
-  async function pullCloudProgress() {
-    if (!authState.user || !isCloudAuthOrigin()) return;
+  async function pullCloudProgress(silent = true) {
+    if (!isUserSignedIn() || !isCloudAuthOrigin()) return;
     authState.syncing = true;
     updateAuthButton();
     try {
@@ -8645,15 +8691,26 @@ if (typeof window !== 'undefined') {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok) {
         if (data.progress && typeof data.progress === 'object' && Object.keys(data.progress).length > 0) {
+          const statsBefore = computeGameStats();
           state.progress = mergeCloudProgress(state.progress, data.progress);
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress)); } catch { /* ignore */ }
           authState.lastSyncedAt = data.updatedAt || new Date().toISOString();
+          const statsAfter = computeGameStats();
+          lastKnownXp = statsAfter.xp;
+          lastKnownLevel = statsAfter.level;
           updateDashboard();
+          emitCore('cloud-synced', { progress: state.progress, stats: statsAfter });
           if (state.activeTab === 'vocab') renderVocab();
           if (state.activeTab === 'profile') renderProfilePage();
           if (state.activeTab === 'tutor') renderTutorPage();
+
+          if (!silent) {
+            showToast(`ซิงก์ข้อมูลสำเร็จ! ระดับของคุณคือ LV.${statsAfter.level}`, `${statsAfter.xp.toLocaleString()} XP`, statsAfter.level > statsBefore.level);
+          } else if (statsAfter.level > statsBefore.level) {
+            showToast(`ซิงก์ข้อมูลจากอุปกรณ์อื่นสำเร็จ! ปรับขึ้นเป็น LV.${statsAfter.level}`, `+${statsAfter.xp - statsBefore.xp} XP`, true);
+          }
         }
-        // Push merged state back so both devices stay in sync
+        // Push merged state back so both devices stay completely in sync
         await pushCloudProgress(true);
       }
     } catch {
@@ -8662,6 +8719,27 @@ if (typeof window !== 'undefined') {
       authState.syncing = false;
       updateAuthButton();
     }
+  }
+
+  // Multi-device foreground auto-sync: re-pull whenever device wakes up, switches tab, or refocuses
+  if (typeof document !== 'undefined') {
+    let lastFocusPull = 0;
+    const triggerFocusPull = () => {
+      const now = Date.now();
+      if (now - lastFocusPull > 8000 && isUserSignedIn()) {
+        lastFocusPull = now;
+        pullCloudProgress(true);
+      }
+    };
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') triggerFocusPull();
+    });
+    window.addEventListener('focus', triggerFocusPull);
+    setInterval(() => {
+      if (document.visibilityState === 'visible' && isUserSignedIn()) {
+        pullCloudProgress(true);
+      }
+    }, 60000);
   }
 
   function openAuthModal() {
@@ -8689,9 +8767,10 @@ if (typeof window !== 'undefined') {
       return;
     }
 
-    if (authState.user) {
-      const name = authState.user.user_metadata?.full_name || 'ผู้เรียน';
-      const email = authState.user.email || '';
+    const activeU = getActiveUser();
+    if (activeU) {
+      const name = activeU.user_metadata?.full_name || 'ผู้เรียน';
+      const email = activeU.email || '';
       const syncedText = authState.lastSyncedAt
         ? new Date(authState.lastSyncedAt).toLocaleString('th-TH')
         : 'พร้อมซิงก์อัตโนมัติ';
@@ -8706,7 +8785,7 @@ if (typeof window !== 'undefined') {
             <div>
               <div style="font-weight:700;font-size:15px">${escapeHtml(name)}</div>
               <div style="font-size:12.5px;color:var(--sys-label-2)">${escapeHtml(email)}</div>
-              <div style="font-size:11.5px;color:var(--sys-green-text);margin-top:3px">● ซิงก์ Postgres อัตโนมัติ · ล่าสุด: ${escapeHtml(syncedText)}</div>
+              <div style="font-size:11.5px;color:var(--sys-green-text);margin-top:3px">● ซิงก์ฐานข้อมูล Cloud อัตโนมัติ · ล่าสุด: ${escapeHtml(syncedText)}</div>
             </div>
           </div>
           <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
@@ -8719,11 +8798,13 @@ if (typeof window !== 'undefined') {
       bd.onclick = (e) => { if (e.target === bd) closeVocabDetailModal(); };
       document.getElementById('vb-modal-close')?.addEventListener('click', closeVocabDetailModal);
       document.getElementById('auth-sync-now')?.addEventListener('click', async () => {
-        await pushCloudProgress(false);
+        await pullCloudProgress(false);
         openAuthModal();
       });
       document.getElementById('auth-logout-btn')?.addEventListener('click', async () => {
         try { if (auth) await auth.logout(); } catch { /* ignore */ }
+        try { if (window.firebase?.auth) await window.firebase.auth().signOut(); } catch { /* ignore */ }
+        window.__nihaoFirebaseUser = null;
         authState.user = null;
         authState.lastSyncedAt = null;
         updateAuthButton();

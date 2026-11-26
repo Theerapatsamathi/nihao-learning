@@ -53,7 +53,7 @@ export function renderGuidedRunner(core, host, onDone) {
                 </div>
                 <div class="m1-row-btns">
                   <button type="button" class="btn-secondary" data-play="${i}">🔊 ฟัง</button>
-                  <button type="button" class="btn-primary" data-ok="${i}">${checkedWarmup.has(i) ? '✓ แล้ว' : 'จำได้แล้ว'}</button>
+                  <button type="button" class="btn-primary" data-ok="${i}" ${checkedWarmup.has(i) ? 'disabled style="opacity:0.65;cursor:default"' : ''}>${checkedWarmup.has(i) ? '✓ แล้ว' : 'จำได้แล้ว'}</button>
                 </div>
               </div>`).join('')}
           </div>
@@ -63,8 +63,10 @@ export function renderGuidedRunner(core, host, onDone) {
         </div>`;
       host.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => core.speak(session.warmup[Number(b.dataset.play)].hz)));
       host.querySelectorAll('[data-ok]').forEach(b => b.addEventListener('click', () => {
-        checkedWarmup.add(Number(b.dataset.ok));
-        core.playChime('ok');
+        const idx = Number(b.dataset.ok);
+        if (checkedWarmup.has(idx)) return;
+        checkedWarmup.add(idx);
+        core.playChime('ok', true);
         draw();
       }));
     } else if (step === 1) {
@@ -89,7 +91,7 @@ export function renderGuidedRunner(core, host, onDone) {
                 </div>
                 <div class="m1-row-btns">
                   <button type="button" class="btn-secondary" data-play="${i}">🔊 ฟัง</button>
-                  <button type="button" class="btn-primary" data-ok="${i}">${checkedTones.has(i) ? '✓ ผ่าน' : 'พูดตามแล้ว'}</button>
+                  <button type="button" class="btn-primary" data-ok="${i}" ${checkedTones.has(i) ? 'disabled style="opacity:0.65;cursor:default"' : ''}>${checkedTones.has(i) ? '✓ ผ่าน' : 'พูดตามแล้ว'}</button>
                 </div>
               </div>`).join('')}
           </div>
@@ -99,8 +101,10 @@ export function renderGuidedRunner(core, host, onDone) {
         </div>`;
       host.querySelectorAll('[data-play]').forEach(b => b.addEventListener('click', () => core.speak(session.toneFocus[Number(b.dataset.play)].hz)));
       host.querySelectorAll('[data-ok]').forEach(b => b.addEventListener('click', () => {
-        checkedTones.add(Number(b.dataset.ok));
-        core.playChime('ok');
+        const idx = Number(b.dataset.ok);
+        if (checkedTones.has(idx)) return;
+        checkedTones.add(idx);
+        core.playChime('ok', true);
         draw();
       }));
     } else if (step === 2) {
@@ -126,7 +130,7 @@ export function renderGuidedRunner(core, host, onDone) {
                 <div class="m1-row-btns">
                   <button type="button" class="btn-secondary" data-slow="${i}">🐢 0.6x</button>
                   <button type="button" class="btn-secondary" data-play="${i}">🔊 ปกติ</button>
-                  <button type="button" class="btn-primary" data-ok="${i}">${checkedSpeak.has(i) ? '✓ คล่อง' : 'พูดแล้ว'}</button>
+                  <button type="button" class="btn-primary" data-ok="${i}" ${checkedSpeak.has(i) ? 'disabled style="opacity:0.65;cursor:default"' : ''}>${checkedSpeak.has(i) ? '✓ คล่อง' : 'พูดแล้ว'}</button>
                 </div>
               </div>`).join('')}
           </div>
@@ -141,27 +145,38 @@ export function renderGuidedRunner(core, host, onDone) {
         core.speak(session.speakItems[Number(b.dataset.slow)].hz, () => { core.state.rate = prev; });
       }));
       host.querySelectorAll('[data-ok]').forEach(b => b.addEventListener('click', () => {
-        checkedSpeak.add(Number(b.dataset.ok));
-        core.playChime('ok');
+        const idx = Number(b.dataset.ok);
+        if (checkedSpeak.has(idx)) return;
+        checkedSpeak.add(idx);
+        core.playChime('ok', true);
         draw();
       }));
     } else {
       // Completed!
+      const extBefore = core.getExt('month1') || {};
+      const todayKey = core.todayKey();
+      const alreadyDoneToday = extBefore.lastGuidedDate === todayKey;
+
       core.setExt('month1', (cur) => {
         const done = new Set(Array.isArray(cur.doneDays) ? cur.doneDays : []);
         if (session.day >= 15) done.add(session.day);
         cur.doneDays = [...done];
-        cur.lastGuidedDate = core.todayKey();
+        cur.lastGuidedDate = todayKey;
         return cur;
       }, { save: false });
-      core.addXp(40, `เรียนรอบประจำวัน Day ${session.day} ครบแล้ว!`);
+
+      if (!alreadyDoneToday) {
+        core.addXp(40, `เรียนรอบประจำวัน Day ${session.day} ครบแล้ว!`);
+      } else {
+        core.addXp(5, `ทบทวนรอบประจำวัน Day ${session.day} ซ้ำ`);
+      }
       core.spawnConfetti(28);
       core.pandaSay('太棒了! เก่งมาก เรียนครบวันนี้แล้ว!');
       host.innerHTML = `
         <div class="card-panel m1-runner" style="text-align:center;padding:32px 20px">
           <div style="font-size:48px">🎉</div>
           <h2 style="margin:8px 0">เยี่ยมมาก! จบชุดเรียน Day ${session.day} แล้ว</h2>
-          <p class="m1-muted">ได้รับ +40 XP · บันทึกความคืบหน้าและรักษา Streak เรียบร้อย</p>
+          <p class="m1-muted">${alreadyDoneToday ? 'ทบทวนซ้ำ (+5 XP) · เก่งมากที่ฝึกฝนอย่างสม่ำเสมอ' : 'ได้รับ +40 XP · บันทึกความคืบหน้าและรักษา Streak เรียบร้อย'}</p>
           <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px">
             <button type="button" class="btn-primary" id="m1-done-back">กลับหน้าเดือนแรก</button>
             <button type="button" class="btn-secondary" id="m1-go-roleplay">🎙️ ไปลองคุย AI Roleplay</button>

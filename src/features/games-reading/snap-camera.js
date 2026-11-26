@@ -128,7 +128,7 @@ export function renderSnapCameraSection(core, host) {
 
     host.querySelector('#gr-snap-demo')?.addEventListener('click', () => {
       state.result = DEMO_SNAP;
-      core.playChime('ok');
+      core.playChime('ok', true);
       draw();
     });
 
@@ -144,7 +144,7 @@ export function renderSnapCameraSection(core, host) {
         if (res.ok && res.data?.snap) {
           state.result = res.data.snap;
           core.addXp(20, 'สแกนรูปภาพเรียนรู้ศัพท์จีนใหม่!');
-          core.playChime('ok');
+          core.playChime('ok', true);
         } else {
           state.result = DEMO_SNAP;
           core.showToast(res.data?.error ? `${res.data.error} · แสดงตัวอย่างเมนูแทน` : 'แสดงตัวอย่างเมนูภาษาจีน');

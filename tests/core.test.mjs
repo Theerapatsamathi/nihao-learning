@@ -112,3 +112,32 @@ test('Progress Merge: mergeTimestampedMap falls back to score when updatedAt is 
   assert.equal(res.w1.reviews, 4);
   assert.deepEqual(mergeMaxNumMap({ a: 3 }, { a: 7, b: 2 }), { a: 7, b: 2 });
 });
+
+test('Progress Merge: merges dayChecks union, spentCoins max, and mistakes', () => {
+  const local = {
+    dayChecks: { '1': ['intro', 'drill'], '2': ['intro'] },
+    spentCoins: 120,
+    vocabGoal: 100,
+    mistakes: [{ id: 'm1', misses: 2 }],
+    daily: { date: '2026-11-26', drills: 5, writes: 2, srs: 3, claimed: ['drill'] }
+  };
+  const cloud = {
+    dayChecks: { '1': ['drill', 'write'], '2': ['drill'], '3': ['intro'] },
+    spentCoins: 200,
+    vocabGoal: 150,
+    mistakes: [{ id: 'm1', misses: 4 }, { id: 'm2', misses: 1 }],
+    daily: { date: '2026-11-26', drills: 2, writes: 4, srs: 5, claimed: ['write'] }
+  };
+  const merged = mergeCloudProgressData(local, cloud);
+  assert.deepEqual(merged.dayChecks['1'].sort(), ['drill', 'intro', 'write']);
+  assert.deepEqual(merged.dayChecks['2'].sort(), ['drill', 'intro']);
+  assert.deepEqual(merged.dayChecks['3'], ['intro']);
+  assert.equal(merged.spentCoins, 200);
+  assert.equal(merged.vocabGoal, 150);
+  const m1 = merged.mistakes.find(m => m.id === 'm1');
+  assert.equal(m1.misses, 4);
+  assert.equal(merged.daily.drills, 5);
+  assert.equal(merged.daily.writes, 4);
+  assert.equal(merged.daily.srs, 5);
+  assert.deepEqual(merged.daily.claimed.sort(), ['drill', 'write']);
+});

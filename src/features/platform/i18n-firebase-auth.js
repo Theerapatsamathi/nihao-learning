@@ -261,22 +261,8 @@ export function initFirebaseGoogleAuth(core) {
   }
 
   const host = window.location.hostname;
-  const isFirebaseHost = host.endsWith('.web.app') || host.endsWith('.firebaseapp.com') || host.endsWith('.run.app');
+  const isFirebaseHost = host.endsWith('.web.app') || host.endsWith('.firebaseapp.com') || host.endsWith('.run.app') || host === 'localhost' || host === '127.0.0.1';
   if (!isFirebaseHost) return;
-
-  let syncTimer = null;
-  const pushFirebaseProgress = () => {
-    if (!window.__nihaoFirebaseUser?.uid || !core?.state?.progress) return;
-    if (syncTimer) clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => {
-      fetch('/api/me/progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ progress: core.state.progress })
-      }).catch(() => {});
-    }, 1500);
-  };
-  core?.on?.('progress', pushFirebaseProgress);
 
   const updateHeader = (user) => {
     const label = document.getElementById('header-auth-label');
@@ -294,12 +280,15 @@ export function initFirebaseGoogleAuth(core) {
     }
   };
 
-  // Check existing Firebase session on load
+  // Check existing Firebase session on load and auto-pull cloud progress
   ensureFirebaseAuth().then((auth) => {
     if (!auth) return;
-    auth.onAuthStateChanged((user) => {
+    auth.onAuthStateChanged(async (user) => {
       window.__nihaoFirebaseUser = user || null;
       updateHeader(user);
+      if (user && typeof core?.pullCloudProgress === 'function') {
+        await core.pullCloudProgress(true);
+      }
     });
   }).catch(() => {});
 
@@ -322,6 +311,9 @@ export function initFirebaseGoogleAuth(core) {
       const bd = document.getElementById('vb-modal-backdrop');
       if (bd) bd.hidden = true;
       core?.showToast(currentLang === 'en' ? `Welcome, ${cred.user.displayName || 'Learner'}!` : `เข้าสู่ระบบด้วย Google สำเร็จ! ยินดีต้อนรับ ${cred.user.displayName || ''}`);
+      if (typeof core?.pullCloudProgress === 'function') {
+        await core.pullCloudProgress(false);
+      }
     } catch (err) {
       const msg = err?.code === 'auth/configuration-not-found' || err?.code === 'auth/operation-not-allowed'
         ? 'กรุณาเปิด Google Provider ใน Firebase Console → Authentication ก่อนใช้งานครับ'

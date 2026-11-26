@@ -114,6 +114,17 @@ html.theme-dark,
   box-sizing: border-box;
 }
 
+[hidden],
+.mo-hud[style*="display: none"],
+.mo-hud-pill[hidden],
+.mo-hud-pill:empty,
+.mo-hud:empty {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;
