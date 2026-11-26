@@ -1,6 +1,45 @@
 // Chinese Copybook Worksheet (สมุดคัดลายมือ 田字格 / 米字格) + Gemini Vision AI Handwriting Grader
 // Supports Apple Pencil / Stylus / Touch / Mouse via Pointer Events, custom text, A4 Print, and AI grading.
 import { HANZI_MNEMONICS } from './data-month1.js';
+import { getSavedGeminiKey } from './live-voice-call.js';
+
+async function gradeWithGeminiVisionDirect(imageDataUrl, chars) {
+  const apiKey = getSavedGeminiKey();
+  if (!apiKey) return null;
+  const b64 = String(imageDataUrl || '').split(',')[1] || '';
+  if (!b64) return null;
+  const prompt = `คุณคือครูคัดลายมือภาษาจีน (书法老师) ที่ตรวจเข้มงวดและตรงไปตรงมา (ห้ามให้คะแนนเฟ้อ)
+ผู้เรียนคัดตัวอักษรจีน: "${chars}" ลงในตาราง 米字格/田字格 ตามภาพที่แนบมา
+จงประเมินลายมือจริงจากภาพ (ความถูกต้องของขีด, สัดส่วนซ้าย-ขวา/บน-ล่าง, ความเรียบร้อยของเส้น, ตำแหน่งในช่อง)
+ตอบกลับเป็น JSON ล้วนเท่านั้น ตามรูปแบบนี้:
+{
+  "overallGrade": "S|A|B|C|D",
+  "overallScore": 0-100,
+  "summary": "สรุปภาพรวมตรงไปตรงมาเป็นภาษาไทย 1-2 ประโยค",
+  "items": [
+    { "char": "ตัวจีน", "score": 0-100, "status": "สรุปสั้นๆ 3-5 คำ", "tip": "คำแนะนำแก้ขีด/สัดส่วนเฉพาะจุดเป็นภาษาไทย" }
+  ]
+}`;
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: 'image/png', data: b64 } }
+        ]
+      }],
+      generationConfig: { responseMimeType: 'application/json' }
+    })
+  });
+  const data = await res.json();
+  const txt = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  if (!txt) return null;
+  const parsed = JSON.parse(txt.replace(/^```json\s*|\s*```$/g, '').trim());
+  if (!parsed || typeof parsed.overallScore !== 'number') return null;
+  return { ...parsed, source: 'gemini' };
+}
 
 const PRESET_DECKS = [
   { id: 'numbers', label: 'ตัวเลข 1–10', chars: '一二三四五六七八九十' },
@@ -405,12 +444,15 @@ export function renderCopybookTab(core, host) {
     try {
       const image = composeCopybookCompositePng(written);
       const uniqueChars = [...new Set(written.map(w => w.char))].join('');
-      const res = await core.api('/api/ai/vision', { mode: 'handwriting', image, chars: uniqueChars }, 'POST');
-      if (res.ok && res.data?.report) {
-        cbState.lastReport = res.data.report;
-      } else {
-        cbState.lastReport = evaluateLocalHandwriting(written);
+      let report = null;
+      try {
+        report = await gradeWithGeminiVisionDirect(image, uniqueChars);
+      } catch { /* fallback below */ }
+      if (!report) {
+        const res = await core.api('/api/ai/vision', { mode: 'handwriting', image, chars: uniqueChars }, 'POST');
+        if (res.ok && res.data?.report) report = res.data.report;
       }
+      cbState.lastReport = report || evaluateLocalHandwriting(written);
       if (cbState.lastReport) {
         core.addXp(25, `ครู AI ตรวจลายมือได้เกรด ${cbState.lastReport.overallGrade}!`);
         core.playChime('ok');
