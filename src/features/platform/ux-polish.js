@@ -50,6 +50,25 @@ const POLISH_CSS = `
   .nihao-fab-ai:active {
     transform: scale(0.95);
   }
+  .nihao-panda-coach {
+    position: fixed;
+    right: 18px;
+    bottom: 72px;
+    z-index: 949;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 260px;
+    padding: 8px 12px;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #f8fafc;
+    font-size: 12.5px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+    border: 1px solid rgba(255,255,255,0.12);
+    cursor: pointer;
+    animation: nihaoFadeUp 260ms ease both;
+  }
 `;
 
 export function fireConfettiBurst() {
@@ -114,6 +133,35 @@ export function initUxPolish(core) {
       return out;
     };
     core._polishXpHooked = true;
+  }
+
+  const PANDA_LINES = [
+    { hz: '加油！你很棒！', th: 'สู้ๆ นะ คุณเก่งมาก!' },
+    { hz: '今天也要学中文哦！', th: 'วันนี้ก็มาเรียนจีนกันนะ!' },
+    { hz: '太厉害了！', th: 'สุดยอดไปเลย!' },
+    { hz: '慢慢来，没关系！', th: 'ค่อยๆ ไป ไม่เป็นไรนะ!' },
+    { hz: '你的发音越来越好！', th: 'ออกเสียงดีขึ้นเรื่อยๆ เลย!' }
+  ];
+
+  // Interactive Panda Coach 🐼
+  if (!document.getElementById('nihao-panda-coach')) {
+    let idx = 0;
+    const panda = document.createElement('div');
+    panda.id = 'nihao-panda-coach';
+    panda.className = 'nihao-panda-coach';
+    const renderPanda = () => {
+      const line = PANDA_LINES[idx % PANDA_LINES.length];
+      panda.innerHTML = `<span style="font-size:22px">🐼</span><div><div class="hanzi-font" style="font-weight:700;color:#6ee7b7">${line.hz}</div><div style="opacity:0.85">${line.th}</div></div>`;
+    };
+    renderPanda();
+    panda.title = 'แตะเพื่อฟังน้องแพนด้าให้กำลังใจเป็นภาษาจีน';
+    panda.addEventListener('click', () => {
+      const line = PANDA_LINES[idx % PANDA_LINES.length];
+      core?.speak?.(line.hz);
+      idx++;
+      renderPanda();
+    });
+    document.body.appendChild(panda);
   }
 
   // Mount Floating ✨ AI Studio Quick-Launch Button
