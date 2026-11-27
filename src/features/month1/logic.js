@@ -151,13 +151,24 @@ export function buildGuidedSession(dayNum, mistakes = [], { intensity = 1 } = {}
   const advDay = safeDay >= 31 ? getAdvancedDayData(safeDay) : null;
   const prevAdvDay = safeDay >= 32 ? getAdvancedDayData(safeDay - 1) : null;
 
+  // Helper to backfill missing Pinyin on saved mistakes by matching normalized Hanzi
+  const lookupPinyinForHz = (rawHz) => {
+    const norm = normalizeChinese(rawHz);
+    if (!norm) return '';
+    const hit =
+      SURVIVAL_50.find((s) => normalizeChinese(s.hz) === norm) ||
+      TONE_PAIRS.find((t) => normalizeChinese(t.hz) === norm) ||
+      HANZI_MNEMONICS.find((h) => normalizeChinese(h.hz) === norm);
+    return hit?.py || '';
+  };
+
   // Step 1: 3 warm-up recall items (mistakes first, then previous-day items)
   const warmup = [];
   const seenHz = new Set();
   for (const m of (Array.isArray(mistakes) ? mistakes : [])) {
     if (warmup.length >= 3) break;
     const hz = String(m?.hanzi || m?.hz || '').trim();
-    const py = String(m?.pinyin || m?.py || '').trim();
+    const py = String(m?.pinyin || m?.py || '').trim() || lookupPinyinForHz(hz);
     const th = String(m?.meaning || m?.th || '').trim();
     if (hz && th && !seenHz.has(hz)) {
       seenHz.add(hz);
