@@ -54,16 +54,23 @@ const LOFI_CSS = `
   body.nihao-lofi-active .nihao-fab-ai {
     display: none !important;
   }
-  body.nihao-lofi-active main,
-  body.nihao-lofi-active .app-shell {
+  body.nihao-lofi-active .app-shell,
+  body.nihao-lofi-active #app,
+  body.nihao-lofi-active .layout {
+    display: block !important;
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    max-width: 100% !important;
     position: relative;
     z-index: 10;
     background: transparent !important;
   }
   body.nihao-lofi-active main {
+    display: block !important;
+    width: min(920px, 92vw) !important;
     max-width: 920px !important;
-    margin: 24px auto 115px !important;
-    padding: 22px !important;
+    margin: 28px auto 125px !important;
+    padding: 24px !important;
     border-radius: 22px !important;
     background: rgba(15, 23, 42, 0.78) !important;
     backdrop-filter: blur(16px) !important;
@@ -71,6 +78,12 @@ const LOFI_CSS = `
     border: 1px solid rgba(255,255,255,0.18) !important;
     box-shadow: 0 24px 60px rgba(0,0,0,0.45) !important;
     color: #f8fafc !important;
+    transition: opacity 320ms ease, transform 320ms ease;
+  }
+  body.nihao-lofi-active.nihao-lofi-scenic main {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(16px) scale(0.98) !important;
   }
   body.nihao-lofi-active main h1,
   body.nihao-lofi-active main h2,
@@ -268,10 +281,15 @@ export function initZenLofiFocusMode() {
 
   const mixer = createAmbientSoundMixer();
   let active = false;
+  let scenicBreak = false;
   let sceneIdx = 0;
   let fxMode = 'fireflies';
   let rafId = null;
   let particles = [];
+  let pomoSec = 25 * 60;
+  let pomoRunning = false;
+  let pomoTimer = null;
+  let genBusy = false;
 
   function initParticles() {
     fxCanvas.width = window.innerWidth;
@@ -343,9 +361,14 @@ export function initZenLofiFocusMode() {
     renderDock();
   }
 
+  function fmtPomo(s) {
+    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  }
+
   function renderDock() {
     dock.innerHTML = `
       ${SCENES.map((s, i) => `<button type="button" class="lofi-pill ${i === sceneIdx ? 'on' : ''}" data-lsc="${i}">${s.label}</button>`).join('')}
+      <button type="button" class="lofi-pill" id="lofi-gen-scene" ${genBusy ? 'disabled' : ''}>${genBusy ? '🎨 กำลังวาด...' : '🎨 เสกฉาก AI'}</button>
       <span style="opacity:0.35">|</span>
       ${FX_MODES.map((f) => `<button type="button" class="lofi-pill ${f.id === fxMode ? 'on' : ''}" data-lfx="${f.id}">${f.label}</button>`).join('')}
       <span style="opacity:0.35">|</span>
@@ -353,11 +376,60 @@ export function initZenLofiFocusMode() {
       <button type="button" class="lofi-pill ${mixer.state.rain ? 'on' : ''}" data-lsnd="rain">🌧️ ฝน</button>
       <button type="button" class="lofi-pill ${mixer.state.fire ? 'on' : ''}" data-lsnd="fire">🔥 เตาผิง</button>
       <button type="button" class="lofi-pill ${mixer.state.wind ? 'on' : ''}" data-lsnd="wind">🌙 ลม</button>
+      <span style="opacity:0.35">|</span>
+      <button type="button" class="lofi-pill ${pomoRunning ? 'on' : ''}" id="lofi-pomo">⏱️ ${fmtPomo(pomoSec)}</button>
+      <button type="button" class="lofi-pill ${scenicBreak ? 'on' : ''}" id="lofi-scenic">${scenicBreak ? '📖 กลับไปเรียน' : '👁️ พักสายตา'}</button>
       <button type="button" class="lofi-pill exit" id="lofi-exit">✕ ออก</button>
     `;
     dock.querySelectorAll('[data-lsc]').forEach((b) => b.addEventListener('click', () => applyScene(Number(b.dataset.lsc))));
     dock.querySelectorAll('[data-lfx]').forEach((b) => b.addEventListener('click', () => { fxMode = b.dataset.lfx; initParticles(); renderDock(); }));
     dock.querySelectorAll('[data-lsnd]').forEach((b) => b.addEventListener('click', () => { mixer.toggle(b.dataset.lsnd); renderDock(); }));
+    dock.querySelector('#lofi-scenic')?.addEventListener('click', () => {
+      scenicBreak = !scenicBreak;
+      document.body.classList.toggle('nihao-lofi-scenic', scenicBreak);
+      renderDock();
+    });
+    dock.querySelector('#lofi-pomo')?.addEventListener('click', () => {
+      if (pomoRunning) {
+        clearInterval(pomoTimer);
+        pomoRunning = false;
+      } else {
+        pomoRunning = true;
+        pomoTimer = setInterval(() => {
+          pomoSec--;
+          const btn = dock.querySelector('#lofi-pomo');
+          if (btn) btn.textContent = `⏱️ ${fmtPomo(Math.max(0, pomoSec))}`;
+          if (pomoSec <= 0) {
+            clearInterval(pomoTimer);
+            pomoRunning = false;
+            pomoSec = 25 * 60;
+            window.NihaoCore?.addXp?.(50, 'lofi-pomodoro');
+            window.NihaoConfetti?.();
+            renderDock();
+          }
+        }, 1000);
+      }
+      renderDock();
+    });
+    dock.querySelector('#lofi-gen-scene')?.addEventListener('click', async () => {
+      const prompt = window.prompt('พิมพ์ฉาก Lofi ที่อยากให้ Imagen 3 วาดให้ (เช่น คาเฟ่หิมะตกที่ฮาร์บิน, ศาลาริมน้ำซูโจว):', 'Cozy rainy cafe in Shanghai at night, Makoto Shinkai anime film style');
+      if (!prompt) return;
+      genBusy = true;
+      renderDock();
+      try {
+        const res = await fetch('/api/ai/imagen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, style: 'Makoto Shinkai ultra-detailed anime film background art, cinematic volumetric lighting, no text', aspectRatio: '16:9' })
+        });
+        const data = await res.json();
+        if (data.ok && data.imageUrl) {
+          bg.style.backgroundImage = `url('${data.imageUrl}')`;
+        }
+      } catch {}
+      genBusy = false;
+      renderDock();
+    });
     dock.querySelector('#lofi-exit')?.addEventListener('click', () => setLofiActive(false));
   }
 
