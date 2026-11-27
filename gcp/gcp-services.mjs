@@ -226,14 +226,15 @@ export async function gcsPut(objectPath, buffer, contentType = 'application/octe
 
 // ---- Cloud Text-to-Speech (Chirp 3: HD Voices with Wavenet/Neural2 fallback + GCS Cache) ----
 
-export async function synthesizeCloudTts(text, lang = 'zh-CN', rate = null) {
+export async function synthesizeCloudTts(text, lang = 'zh-CN', rate = null, voiceGender = 'female') {
   const isThai = String(lang).toLowerCase().startsWith('th');
+  const isMale = String(voiceGender).toLowerCase() === 'male';
   const primaryVoice = isThai
-    ? { languageCode: 'th-TH', name: process.env.GCP_TTS_VOICE_TH || 'th-TH-Chirp3-HD-Aoede' }
-    : { languageCode: 'cmn-CN', name: process.env.GCP_TTS_VOICE_ZH || 'cmn-CN-Chirp3-HD-Aoede' };
+    ? { languageCode: 'th-TH', name: isMale ? 'th-TH-Chirp3-HD-Charon' : (process.env.GCP_TTS_VOICE_TH || 'th-TH-Chirp3-HD-Aoede') }
+    : { languageCode: 'cmn-CN', name: isMale ? 'cmn-CN-Chirp3-HD-Charon' : (process.env.GCP_TTS_VOICE_ZH || 'cmn-CN-Chirp3-HD-Aoede') };
   const fallbackVoice = isThai
     ? { languageCode: 'th-TH', name: 'th-TH-Neural2-C' }
-    : { languageCode: 'cmn-CN', name: 'cmn-CN-Wavenet-A' };
+    : { languageCode: 'cmn-CN', name: isMale ? 'cmn-CN-Wavenet-B' : 'cmn-CN-Wavenet-A' };
 
   const clampedRate = rate ? Math.max(0.5, Math.min(1.5, Number(rate) || 1.0)) : null;
   const rateTag = clampedRate ? `r${clampedRate.toFixed(2)}` : 'rdef';

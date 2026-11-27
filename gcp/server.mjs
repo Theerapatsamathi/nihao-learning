@@ -340,16 +340,17 @@ async function handleApi(req, res, urlObj) {
   if (p === '/api/tts') {
     const text = String(urlObj.searchParams.get('text') || '').trim().slice(0, 160);
     const lang = String(urlObj.searchParams.get('lang') || 'zh-CN').trim();
+    const voiceGender = String(urlObj.searchParams.get('voice') || 'female').trim().toLowerCase();
     const rateParam = urlObj.searchParams.get('rate');
     const rate = rateParam ? Math.max(0.5, Math.min(1.5, Number(rateParam) || 1.0)) : null;
     if (!text) return sendJson(res, 400, { ok: false, error: 'Missing text' });
-    const cacheKey = `${lang}:${rate ? rate.toFixed(2) : 'def'}:${text}`;
+    const cacheKey = `${lang}:${voiceGender}:${rate ? rate.toFixed(2) : 'def'}:${text}`;
     if (ttsCache.has(cacheKey)) {
       res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=604800', 'X-TTS-Source': 'memory' });
       return res.end(ttsCache.get(cacheKey));
     }
     try {
-      const gcpTts = await synthesizeCloudTts(text, lang, rate);
+      const gcpTts = await synthesizeCloudTts(text, lang, rate, voiceGender);
       let buf = gcpTts?.buffer || null;
       let source = gcpTts?.source || 'fallback';
       if (!buf) {
@@ -739,6 +740,103 @@ async function handleApi(req, res, urlObj) {
     }
     const uiLang = String(req.headers['x-nihao-lang'] || body.lang || 'th').toLowerCase() === 'en' ? 'English' : 'Thai';
     const usage = { used: quota.used, limit: quota.limit, remaining: quota.remaining };
+
+    // ---- AI Personal Podcast Generator (2-host Chirp 3 HD Dialogue) ----
+    if (p === '/api/ai/podcast') {
+      const words = Array.isArray(body.words) ? body.words.slice(0, 10) : [];
+      const topic = String(body.topic || 'ชีวิตประจำวันในจีน').trim().slice(0, 100);
+      const level = String(body.level || 'HSK 1-2').trim().slice(0, 20);
+      const vocabStr = words.map(w => `${w.hz || w.hanzi || w} (${w.py || ''}: ${w.th || ''})`).join(', ');
+      const { data, model } = await generateStructuredJson({
+        contents: `Create a lively 6-line Mandarin Chinese mini-podcast dialogue between Host A (小美, female) and Host B (大明, male) at ${level} level about "${topic}". Naturally weave in these vocabulary words if provided: ${vocabStr || '你好, 谢谢, 喜欢, 咖啡, 朋友'}.`,
+        systemInstruction: `Return JSON {title, topicSummary (${uiLang}), lines:[{speaker ("A" or "B"), hz, py, th (${uiLang}), highlightWord}]}. Keep each line short, natural, and fun to listen to.`,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            topicSummary: { type: Type.STRING },
+            lines: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  speaker: { type: Type.STRING },
+                  hz: { type: Type.STRING },
+                  py: { type: Type.STRING },
+                  th: { type: Type.STRING },
+                  highlightWord: { type: Type.STRING }
+                },
+                required: ['speaker', 'hz', 'py', 'th', 'highlightWord']
+              }
+            }
+          },
+          required: ['title', 'topicSummary', 'lines']
+        }
+      });
+      return sendJson(res, 200, { ok: true, model, usage, podcast: data });
+    }
+
+    // ---- Visual Mnemonic Flashcard (Gemini Story + Vertex AI Imagen 3) ----
+    if (p === '/api/ai/mnemonic') {
+      const hz = String(body.hz || '').trim().slice(0, 20);
+      const py = String(body.py || '').trim().slice(0, 60);
+      const th = String(body.th || '').trim().slice(0, 100);
+      if (!hz) return sendJson(res, 400, { ok: false, error: 'Missing hz' });
+      const { data, model } = await generateStructuredJson({
+        contents: `Create a vivid, unforgettable visual mnemonic for the Chinese word "${hz}" (${py} = ${th}).`,
+        systemInstruction: `You are a creative Chinese character memory coach for ${uiLang} learners. Return JSON {hz, py, th, radicalBreakdown (${uiLang}), memoryStory (fun 2-sentence visual story in ${uiLang}), imagePrompt (vivid English scene description for an illustrator, no text)}.`,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            hz: { type: Type.STRING },
+            py: { type: Type.STRING },
+            th: { type: Type.STRING },
+            radicalBreakdown: { type: Type.STRING },
+            memoryStory: { type: Type.STRING },
+            imagePrompt: { type: Type.STRING }
+          },
+          required: ['hz', 'py', 'th', 'radicalBreakdown', 'memoryStory', 'imagePrompt']
+        }
+      });
+      const img = await generateVertexImagen(
+        `${data.imagePrompt}. Warm playful flat vector illustration, vibrant colors, strictly no text or letters`,
+        '1:1'
+      );
+      if (img?.imageUrl) data.imageUrl = img.imageUrl;
+      return sendJson(res, 200, { ok: true, model, usage, mnemonic: data });
+    }
+
+    // ---- AI Weakness Auto-Drill (3-Minute Targeted Repair Session) ----
+    if (p === '/api/ai/weakness-drill') {
+      const mistakes = Array.isArray(body.mistakes) ? body.mistakes.slice(0, 12) : [];
+      const weakTones = Array.isArray(body.weakTones) ? body.weakTones.slice(0, 4) : [];
+      const { data, model } = await generateStructuredJson({
+        contents: `Learner's frequent mistakes: ${JSON.stringify(mistakes)}. Weak tones: ${JSON.stringify(weakTones)}. Build a targeted 5-item 3-minute Mandarin repair drill.`,
+        systemInstruction: `You are a precision Mandarin coach for ${uiLang} learners. Return JSON {focusTitle (${uiLang}), coachTip (${uiLang}), drills:[{hz, py, th (${uiLang}), trapNote (why learners mix this up in ${uiLang})}]}.`,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            focusTitle: { type: Type.STRING },
+            coachTip: { type: Type.STRING },
+            drills: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  hz: { type: Type.STRING },
+                  py: { type: Type.STRING },
+                  th: { type: Type.STRING },
+                  trapNote: { type: Type.STRING }
+                },
+                required: ['hz', 'py', 'th', 'trapNote']
+              }
+            }
+          },
+          required: ['focusTitle', 'coachTip', 'drills']
+        }
+      });
+      return sendJson(res, 200, { ok: true, model, usage, drill: data });
+    }
 
     // ---- Gemini Multimodal Audio Speaking Coach & Semantic Exam Grader ----
     if (p === '/api/ai/speak-audio') {
