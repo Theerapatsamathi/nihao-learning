@@ -13,6 +13,7 @@ import { renderRetentionSuite } from './retention-suite.js';
 import { renderViralChineseLab } from './viral-studio.js';
 import { renderChinaFunHub } from './china-fun-hub.js';
 import { renderVibeStudio, initVibeAndCommandPalette } from './vibe-studio.js';
+import { renderArcadeRpgHub } from './arcade-rpg-hub.js';
 import { initUxPolish } from './ux-polish.js';
 
 const core = window.NihaoCore;
@@ -90,6 +91,20 @@ if (core) {
     sectionTitle: '✨ AI Studio',
     render(host) {
       renderVibeStudio(core, host);
+    }
+  });
+
+  core.registerTab({
+    id: 'arcade-rpg-hub',
+    label: '⚡ ฝนพินอิน & RPG',
+    title: '⚡ เกมฝนพินอิน (Type-Racer) & โปรไฟล์ RPG จีน',
+    desc: 'พิมพ์พินอินแข่งกับเวลาเก็บ Combo x5 · ดูหน้าโปรไฟล์พลังภาษาจีนของคุณ',
+    emoji: '⚡',
+    iconClass: 'icon-amber',
+    section: 'ai',
+    sectionTitle: '✨ AI Studio',
+    render(host) {
+      renderArcadeRpgHub(core, host);
     }
   });
   const displayCtrl = initDisplayMode(core);

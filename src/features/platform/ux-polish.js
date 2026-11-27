@@ -168,6 +168,44 @@ const POLISH_CSS = `
     animation: nihaoPandaBob 2.8s ease-in-out infinite;
   }
   .nihao-panda-coach:active { transform: scale(0.92); }
+
+  /* Mobile Bottom Navigation Bar (Duolingo-style) */
+  .nihao-mobile-nav {
+    display: none;
+  }
+  @media (max-width: 768px) {
+    body { padding-bottom: 68px; }
+    .nihao-fab-ai { bottom: 74px; right: 12px; padding: 10px 14px; font-size: 13px; }
+    .nihao-panda-coach { bottom: 124px; right: 12px; }
+    .nihao-mobile-nav {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 60px;
+      z-index: 960;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      background: rgba(15, 23, 42, 0.96);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid rgba(255,255,255,0.12);
+    }
+    .nihao-mnav-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      border: none;
+      background: transparent;
+      color: #cbd5e1;
+      font-size: 10.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .nihao-mnav-btn span:first-child { font-size: 19px; }
+    .nihao-mnav-btn:active { transform: scale(0.9); color: #6ee7b7; }
+  }
 `;
 
 export function fireConfettiBurst() {
@@ -316,5 +354,27 @@ export function initUxPolish(core) {
       else if (core?.setTab) core.setTab('ai-flagship-studio');
     });
     document.body.appendChild(btn);
+  }
+
+  // Mount Mobile Bottom Navigation Bar
+  if (!document.getElementById('nihao-mobile-nav')) {
+    const nav = document.createElement('nav');
+    nav.id = 'nihao-mobile-nav';
+    nav.className = 'nihao-mobile-nav';
+    const items = [
+      { tab: 'today', icon: '🏠', label: 'หน้าหลัก' },
+      { tab: 'speak-studio', icon: '🎙️', label: 'ฝึกพูด' },
+      { tab: 'ai-flagship-studio', icon: '✨', label: 'AI Studio' },
+      { tab: 'panda-retention', icon: '🐼', label: 'แพนด้า' },
+      { tab: 'vibe-focus-studio', icon: '🎧', label: 'กู่เจิง' }
+    ];
+    nav.innerHTML = items.map((it) => `<button type="button" class="nihao-mnav-btn" data-mtab="${it.tab}"><span>${it.icon}</span><span>${it.label}</span></button>`).join('');
+    nav.querySelectorAll('[data-mtab]').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (core?.switchTab) core.switchTab(b.dataset.mtab);
+        else if (core?.setTab) core.setTab(b.dataset.mtab);
+      });
+    });
+    document.body.appendChild(nav);
   }
 }
