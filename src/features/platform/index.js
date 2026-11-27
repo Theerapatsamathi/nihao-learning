@@ -12,6 +12,7 @@ import { renderAiFlagshipHub } from './ai-flagship-hub.js';
 import { renderRetentionSuite } from './retention-suite.js';
 import { renderViralChineseLab } from './viral-studio.js';
 import { renderChinaFunHub } from './china-fun-hub.js';
+import { renderVibeStudio, initVibeAndCommandPalette } from './vibe-studio.js';
 import { initUxPolish } from './ux-polish.js';
 
 const core = window.NihaoCore;
@@ -20,6 +21,7 @@ if (core) {
   initLanguageSwitcher(core);
   initFirebaseGoogleAuth(core);
   initUxPolish(core);
+  initVibeAndCommandPalette(core);
 
   core.registerTab({
     id: 'ai-flagship-studio',
@@ -74,6 +76,20 @@ if (core) {
     sectionTitle: '✨ AI Studio',
     render(host) {
       renderChinaFunHub(core, host);
+    }
+  });
+
+  core.registerTab({
+    id: 'vibe-focus-studio',
+    label: '🎧 กู่เจิง Lo-Fi & ธีม',
+    title: '🎧 วิทยุกู่เจิง Lo-Fi · Pomodoro · ธีมโลกจีน',
+    desc: 'เปิดเพลงพิณจีนเพนทาโทนิก + เสียงฝนตกเบาๆ · นาฬิกาโฟกัส Pomodoro · สลับธีมโลกจีน 4 สไตล์ · กด Ctrl+K ค้นหาด่วน',
+    emoji: '🎧',
+    iconClass: 'icon-teal',
+    section: 'ai',
+    sectionTitle: '✨ AI Studio',
+    render(host) {
+      renderVibeStudio(core, host);
     }
   });
   const displayCtrl = initDisplayMode(core);
