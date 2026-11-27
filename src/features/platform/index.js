@@ -14,6 +14,7 @@ import { renderViralChineseLab } from './viral-studio.js';
 import { renderChinaFunHub } from './china-fun-hub.js';
 import { renderVibeStudio, initVibeAndCommandPalette } from './vibe-studio.js';
 import { renderArcadeRpgHub } from './arcade-rpg-hub.js';
+import { initZenLofiFocusMode } from './lofi-focus-mode.js';
 import { initUxPolish } from './ux-polish.js';
 
 const core = window.NihaoCore;
@@ -23,6 +24,7 @@ if (core) {
   initFirebaseGoogleAuth(core);
   initUxPolish(core);
   initVibeAndCommandPalette(core);
+  initZenLofiFocusMode();
 
   core.registerTab({
     id: 'ai-flagship-studio',
