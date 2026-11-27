@@ -8,12 +8,29 @@ import { initOfflinePack } from './offline-pack.js';
 import { initWordOfTheDay } from './wotd.js';
 import { collectWhatsNewTabs } from './whats-new.js';
 import { initLanguageSwitcher, initFirebaseGoogleAuth } from './i18n-firebase-auth.js';
+import { renderAiFlagshipHub } from './ai-flagship-hub.js';
+import { initUxPolish } from './ux-polish.js';
 
 const core = window.NihaoCore;
 
 if (core) {
   initLanguageSwitcher(core);
   initFirebaseGoogleAuth(core);
+  initUxPolish(core);
+
+  core.registerTab({
+    id: 'ai-flagship-studio',
+    label: '✨ AI Studio',
+    title: '✨ Flagship AI Studio (Google Cloud)',
+    desc: 'พอดแคสต์จีน 2 พิธีกร · การ์ดภาพช่วยจำ Imagen 3 · ซ่อมจุดอ่อน 3 นาที · การ์ดแชร์เลเวล',
+    emoji: '✨',
+    iconClass: 'icon-amber',
+    section: 'ai',
+    sectionTitle: '✨ AI Studio',
+    render(host) {
+      renderAiFlagshipHub(core, host);
+    }
+  });
   const displayCtrl = initDisplayMode(core);
   const hapticsCtrl = initHapticsSfx(core);
   const remindersCtrl = initReminders(core);
