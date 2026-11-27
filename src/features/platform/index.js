@@ -9,6 +9,7 @@ import { initWordOfTheDay } from './wotd.js';
 import { collectWhatsNewTabs } from './whats-new.js';
 import { initLanguageSwitcher, initFirebaseGoogleAuth } from './i18n-firebase-auth.js';
 import { renderAiFlagshipHub } from './ai-flagship-hub.js';
+import { renderRetentionSuite } from './retention-suite.js';
 import { initUxPolish } from './ux-polish.js';
 
 const core = window.NihaoCore;
@@ -29,6 +30,20 @@ if (core) {
     sectionTitle: '✨ AI Studio',
     render(host) {
       renderAiFlagshipHub(core, host);
+    }
+  });
+
+  core.registerTab({
+    id: 'panda-retention',
+    label: '🎋 แพนด้า & ภารกิจ',
+    title: '🎋 สวนแพนด้า · สปรินต์ 60 วิ · กล่องสุ่ม · พาสปอร์ตจีน',
+    desc: 'เลี้ยงน้องแพนด้าโตตาม Streak · ต่อ Streak ด่วนใน 1 นาที · เปิดกล่องสุ่มรายวัน · เก็บตราประทับ 6 เมืองจีน',
+    emoji: '🐼',
+    iconClass: 'icon-emerald',
+    section: 'ai',
+    sectionTitle: '✨ AI Studio',
+    render(host) {
+      renderRetentionSuite(core, host);
     }
   });
   const displayCtrl = initDisplayMode(core);
