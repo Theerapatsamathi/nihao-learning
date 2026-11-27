@@ -12,6 +12,12 @@ import {
   firestoreSet,
   firestoreList,
   synthesizeCloudTts,
+  transcribeCloudStt,
+  generateVertexImagen,
+  detectCloudVisionText,
+  translateCloudText,
+  getCacheBucket,
+  getProjectId,
   verifyFirebaseIdToken
 } from './gcp-services.mjs';
 
@@ -244,7 +250,57 @@ async function handleApi(req, res, urlObj) {
   const userId = authInfo.userId;
 
   if (p === '/api/health') {
-    return sendJson(res, 200, { ok: true, runtime: 'gcp-cloud-run', aiConfigured: isAiConfigured(), verifiedAuth: authInfo.verified });
+    return sendJson(res, 200, {
+      ok: true,
+      runtime: 'gcp-cloud-run',
+      aiConfigured: isAiConfigured(),
+      verifiedAuth: authInfo.verified,
+      gcsCache: Boolean(getCacheBucket())
+    });
+  }
+
+  if (p === '/api/gcp/capabilities') {
+    const hasProject = Boolean(getProjectId());
+    const vertex = process.env.GOOGLE_GENAI_USE_VERTEXAI === 'true' && hasProject;
+    return sendJson(res, 200, {
+      ok: true,
+      project: getProjectId() || null,
+      services: {
+        vertexGemini: vertex || isAiConfigured(),
+        chirp3HdTts: hasProject,
+        chirp2Stt: hasProject,
+        imagen3: hasProject,
+        cloudVisionOcr: hasProject,
+        cloudTranslateV3: hasProject,
+        gcsCache: Boolean(getCacheBucket()),
+        firestore: hasProject,
+        cloudScheduler: true
+      }
+    });
+  }
+
+  // ---- Cloud Scheduler Weekly Reset Webhook (League + Boss Raid) ----
+  if (p === '/api/cron/weekly-reset' && req.method === 'POST') {
+    const expectedSecret = String(process.env.CRON_SECRET || '').trim();
+    const provided = String(req.headers['x-cron-secret'] || '').trim();
+    const isCloudScheduler = String(req.headers['user-agent'] || '').includes('Google-Cloud-Scheduler');
+    if (expectedSecret && provided !== expectedSecret && !isCloudScheduler) {
+      return sendJson(res, 403, { ok: false, error: 'Forbidden' });
+    }
+    const remote = await firestoreList('nihao_arena_lb', 200);
+    let resetCount = 0;
+    for (const r of remote) {
+      if (!r || !r.userId) continue;
+      const updated = { ...r, lastWeekXp: Number(r.weeklyXp || 0), weeklyXp: 0, updatedAt: new Date().toISOString() };
+      leagueStore.set(r.userId, updated);
+      await firestoreSet('nihao_arena_lb', sanitizeDocId(r.userId), updated);
+      resetCount++;
+    }
+    const weekId = getIsoWeekId();
+    const freshBoss = createDefaultBossState(weekId);
+    raidStore.set(weekId, freshBoss);
+    await firestoreSet('nihao_arena_raid', weekId, freshBoss);
+    return sendJson(res, 200, { ok: true, weekId, resetCount, bossName: freshBoss.bossName });
   }
 
   if (p === '/api/ai/status') {
@@ -284,14 +340,18 @@ async function handleApi(req, res, urlObj) {
   if (p === '/api/tts') {
     const text = String(urlObj.searchParams.get('text') || '').trim().slice(0, 160);
     const lang = String(urlObj.searchParams.get('lang') || 'zh-CN').trim();
+    const rateParam = urlObj.searchParams.get('rate');
+    const rate = rateParam ? Math.max(0.5, Math.min(1.5, Number(rateParam) || 1.0)) : null;
     if (!text) return sendJson(res, 400, { ok: false, error: 'Missing text' });
-    const cacheKey = `${lang}:${text}`;
+    const cacheKey = `${lang}:${rate ? rate.toFixed(2) : 'def'}:${text}`;
     if (ttsCache.has(cacheKey)) {
-      res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=604800' });
+      res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=604800', 'X-TTS-Source': 'memory' });
       return res.end(ttsCache.get(cacheKey));
     }
     try {
-      let buf = await synthesizeCloudTts(text, lang);
+      const gcpTts = await synthesizeCloudTts(text, lang, rate);
+      let buf = gcpTts?.buffer || null;
+      let source = gcpTts?.source || 'fallback';
       if (!buf) {
         const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(text)}`;
         const upstream = await fetch(ttsUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
@@ -300,7 +360,7 @@ async function handleApi(req, res, urlObj) {
       }
       if (ttsCache.size > 400) ttsCache.clear();
       ttsCache.set(cacheKey, buf);
-      res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=604800' });
+      res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=604800', 'X-TTS-Source': source });
       return res.end(buf);
     } catch {
       return sendJson(res, 502, { ok: false, error: 'TTS fetch error' });
@@ -603,19 +663,142 @@ async function handleApi(req, res, urlObj) {
     return sendJson(res, 405, { ok: false, error: 'Method not allowed' });
   }
 
-  // AI Endpoints (/api/ai/tutor, /api/ai/speak, /api/ai/story, /api/ai/vocab-story, /api/ai/vision)
+  // AI Endpoints (/api/ai/tutor, /api/ai/speak, /api/ai/speak-audio, /api/ai/story, /api/ai/vocab-story, /api/ai/vision, /api/ai/stt, /api/ai/imagen, /api/ai/translate)
   if (p.startsWith('/api/ai/') && req.method === 'POST') {
+    const maxBytes = (p === '/api/ai/vision' || p === '/api/ai/stt' || p === '/api/ai/speak-audio') ? 6 * 1024 * 1024 : 256 * 1024;
+    const body = await readJsonBody(req, maxBytes);
+
+    // ---- Cloud Speech-to-Text V2 (Chirp 2) Endpoint (works even without Gemini API key if GCP token present) ----
+    if (p === '/api/ai/stt') {
+      const rawAudio = String(body.audio || '').trim();
+      const b64 = rawAudio.includes(',') ? rawAudio.split(',').pop().replace(/\s+/g, '') : rawAudio.replace(/\s+/g, '');
+      const lang = String(body.lang || 'cmn-Hans-CN').trim();
+      if (!b64 || b64.length < 32) {
+        return sendJson(res, 400, { ok: false, error: 'Missing or invalid audio payload' });
+      }
+      const stt = await transcribeCloudStt(b64, lang);
+      if (!stt) {
+        return sendJson(res, 503, { ok: false, error: 'Cloud Speech-to-Text (Chirp 2) ไม่พร้อมใช้งานในสภาพแวดล้อมนี้' });
+      }
+      return sendJson(res, 200, { ok: true, ...stt });
+    }
+
+    // ---- Cloud Translation API v3 (Fast, Low-Cost Instant Lookup) ----
+    if (p === '/api/ai/translate') {
+      const text = String(body.text || '').trim().slice(0, 500);
+      const target = String(body.target || 'th').trim().slice(0, 12);
+      const source = String(body.source || '').trim().slice(0, 12);
+      if (!text) return sendJson(res, 400, { ok: false, error: 'Missing text' });
+      const cloudTr = await translateCloudText(text, target, source);
+      if (cloudTr) {
+        return sendJson(res, 200, { ok: true, ...cloudTr });
+      }
+      if (!isAiConfigured()) {
+        return sendJson(res, 503, { ok: false, error: 'Cloud Translation ไม่พร้อมใช้งาน' });
+      }
+      const { data, model } = await generateStructuredJson({
+        contents: `Translate "${text}" to language code "${target}".`,
+        systemInstruction: 'Return JSON {translatedText, detectedLanguageCode}.',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: { translatedText: { type: Type.STRING }, detectedLanguageCode: { type: Type.STRING } },
+          required: ['translatedText', 'detectedLanguageCode']
+        }
+      });
+      return sendJson(res, 200, { ok: true, ...data, engine: model });
+    }
+
+    // ---- Vertex AI Imagen 3 (Flashcard & Story Illustration Generator + GCS Cache) ----
+    if (p === '/api/ai/imagen') {
+      const quota = await checkAiQuota(userId);
+      if (!quota.ok) {
+        return sendJson(res, 429, { ok: false, code: 'RATE_LIMITED', error: `ครบโควตา AI วันนี้แล้ว (${DAILY_AI_LIMIT} ครั้ง/วัน)` });
+      }
+      const topic = String(body.prompt || body.topic || body.vocab || '').trim().slice(0, 240);
+      const style = String(body.style || 'warm modern Chinese children book illustration, clean flat vector art, vibrant colors, no text').slice(0, 140);
+      const aspectRatio = ['1:1', '16:9', '4:3', '3:4'].includes(body.aspectRatio) ? body.aspectRatio : '16:9';
+      if (!topic) return sendJson(res, 400, { ok: false, error: 'Missing prompt/topic' });
+      const fullPrompt = `${topic}. Style: ${style}. Strictly no written letters or watermarks.`;
+      const imgRes = await generateVertexImagen(fullPrompt, aspectRatio);
+      if (!imgRes) {
+        return sendJson(res, 503, { ok: false, error: 'Vertex AI Imagen 3 ไม่พร้อมใช้งานในสภาพแวดล้อมนี้' });
+      }
+      return sendJson(res, 200, {
+        ok: true,
+        ...imgRes,
+        usage: { used: quota.used, limit: quota.limit, remaining: quota.remaining }
+      });
+    }
+
     if (!isAiConfigured()) {
       return sendJson(res, 503, { ok: false, error: 'ยังไม่ได้ตั้งค่า GEMINI_API_KEY หรือ Vertex AI บน Cloud Run' });
     }
-    const maxBytes = p === '/api/ai/vision' ? 4 * 1024 * 1024 : 256 * 1024;
-    const body = await readJsonBody(req, maxBytes);
     const quota = await checkAiQuota(userId);
     if (!quota.ok) {
       return sendJson(res, 429, { ok: false, code: 'RATE_LIMITED', error: `ครบโควตา AI วันนี้แล้ว (${DAILY_AI_LIMIT} ครั้ง/วัน)` });
     }
     const uiLang = String(req.headers['x-nihao-lang'] || body.lang || 'th').toLowerCase() === 'en' ? 'English' : 'Thai';
     const usage = { used: quota.used, limit: quota.limit, remaining: quota.remaining };
+
+    // ---- Gemini Multimodal Audio Speaking Coach & Semantic Exam Grader ----
+    if (p === '/api/ai/speak-audio') {
+      const rawAudio = String(body.audio || '').trim();
+      const m = rawAudio.match(/^data:(audio\/[a-z0-9.+-]+)(?:;[^,]*)?;base64,([A-Za-z0-9+/=\s]+)$/i);
+      const mimeType = m ? m[1].toLowerCase() : 'audio/webm';
+      const audioData = m ? m[2].replace(/\s+/g, '') : rawAudio.replace(/\s+/g, '');
+      if (!audioData || audioData.length < 32) {
+        return sendJson(res, 400, { ok: false, error: 'Missing or invalid audio payload' });
+      }
+      const targetHz = String(body.targetHz || '').trim().slice(0, 200);
+      const targetPy = String(body.targetPy || '').trim().slice(0, 200);
+      const targetTh = String(body.targetTh || '').trim().slice(0, 200);
+      const context = String(body.context || '').trim().slice(0, 240);
+      const examMode = body.mode === 'exam';
+
+      const { data, model } = await generateStructuredJson({
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType, data: audioData } },
+              {
+                text:
+                  `Listen carefully to this learner's Mandarin Chinese speech.\n` +
+                  `Target Chinese: "${targetHz || '(free speech)'}"\n` +
+                  `Target Pinyin: "${targetPy}"\n` +
+                  `Target Meaning: "${targetTh}"\n` +
+                  `Context: "${context || (examMode ? 'Speaking Exam' : 'Speaking Practice')}"\n` +
+                  `IMPORTANT: Grade semantically and naturally like a real native Mandarin teacher. ` +
+                  `If the learner uses a natural Mandarin synonym or polite phrasing that conveys the same meaning clearly, ACCEPT IT (passed=true, high semanticScore) instead of penalizing for not matching word-for-word. ` +
+                  `Listen to actual tones, rhythm, and pronunciation.`
+              }
+            ]
+          }
+        ],
+        systemInstruction:
+          `You are a warm, perceptive native Mandarin Chinese speaking examiner & pronunciation coach for ${uiLang} learners. ` +
+          `Listen directly to the audio and return JSON: ` +
+          `{heardHz, heardPy, passed (boolean, true if overallScore >= 70), overallScore (0-100), tonesScore (0-100), fluencyScore (0-100), naturalnessScore (0-100), semanticScore (0-100), naturalAlternative (a natural native way to say it in Chinese + Pinyin), toneFeedback (specific tone advice in ${uiLang}), tip (warm, actionable coaching in ${uiLang})}.`,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            heardHz: { type: Type.STRING },
+            heardPy: { type: Type.STRING },
+            passed: { type: Type.BOOLEAN },
+            overallScore: { type: Type.INTEGER },
+            tonesScore: { type: Type.INTEGER },
+            fluencyScore: { type: Type.INTEGER },
+            naturalnessScore: { type: Type.INTEGER },
+            semanticScore: { type: Type.INTEGER },
+            naturalAlternative: { type: Type.STRING },
+            toneFeedback: { type: Type.STRING },
+            tip: { type: Type.STRING }
+          },
+          required: ['heardHz', 'heardPy', 'passed', 'overallScore', 'tonesScore', 'fluencyScore', 'naturalnessScore', 'semanticScore', 'naturalAlternative', 'toneFeedback', 'tip']
+        }
+      });
+      return sendJson(res, 200, { ok: true, model, usage, evaluation: data });
+    }
 
     // ---- Gemini Vision Endpoint: Handwriting Grader, Snap & Learn Camera, Handwriting Lookup ----
     if (p === '/api/ai/vision') {
@@ -668,13 +851,17 @@ async function handleApi(req, res, urlObj) {
       }
 
       if (mode === 'snap') {
+        const ocrHint = await detectCloudVisionText(img.data);
+        const snapPrompt = ocrHint
+          ? `Extract all useful Mandarin Chinese words/menu items/signs from this photo and teach the learner how to read and use them in real life.\nCloud Vision OCR detected text:\n${ocrHint.slice(0, 1200)}`
+          : 'Extract all useful Mandarin Chinese words/menu items/signs from this photo and teach the learner how to read and use them in real life.';
         const { data, model } = await generateStructuredJson({
           contents: [
             {
               role: 'user',
               parts: [
                 { inlineData: img },
-                { text: 'Extract all useful Mandarin Chinese words/menu items/signs from this photo and teach the learner how to read and use them in real life.' }
+                { text: snapPrompt }
               ]
             }
           ],
@@ -865,6 +1052,13 @@ async function handleApi(req, res, urlObj) {
         }
       });
       data.id = 'ai_' + Date.now();
+      if (body.includeImage !== false) {
+        const cover = await generateVertexImagen(
+          `Cozy illustrated scene representing "${topic}" in China, warm modern storybook art, vibrant colors, no text`,
+          '16:9'
+        );
+        if (cover?.imageUrl) data.coverImage = cover.imageUrl;
+      }
       return sendJson(res, 200, { ok: true, model, usage, story: data });
     }
 

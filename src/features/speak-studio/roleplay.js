@@ -118,6 +118,8 @@ export function createRoleplayController(core) {
     hintsUsed: 0,
     currentHintLevel: 0,
     latestHint: null,
+    handsFree: false,
+    aiSpeed: 1.0,
     busy: false,
     listening: false,
     recCtrl: null,
@@ -326,7 +328,13 @@ export function createRoleplayController(core) {
           <button type="button" class="btn-secondary" id="ss-rp-hint" ${state.currentHintLevel >= 3 ? 'disabled' : ''}>
             💡 ขอคำใบ้ (${state.currentHintLevel}/3)
           </button>
+          <button type="button" class="btn-secondary" id="ss-rp-speed" title="ปรับความเร็วเสียงครู AI">
+            ⚡ ${state.aiSpeed === 0.75 ? 'ช้า 0.75x' : state.aiSpeed === 1.15 ? 'เจ้าของภาษา 1.15x' : 'ปกติ 1.0x'}
+          </button>
           ${hasSpeechRecognition() ? `
+            <button type="button" class="btn-secondary ${state.handsFree ? 'is-active' : ''}" id="ss-rp-hf" title="เปิดไมค์อัตโนมัติหลัง AI ตอบ">
+              🎧 แฮนด์ฟรี: ${state.handsFree ? 'เปิด' : 'ปิด'}
+            </button>
             <button type="button" class="btn-primary" id="ss-rp-mic">
               ${state.listening ? '⏹️ กำลังฟัง...' : '🎙️ พูดภาษาจีน'}
             </button>
@@ -369,7 +377,21 @@ export function createRoleplayController(core) {
       }
     });
 
-    host.querySelector('#ss-rp-mic')?.addEventListener('click', () => {
+    host.querySelector('#ss-rp-speed')?.addEventListener('click', () => {
+      const speeds = [0.75, 1.0, 1.15];
+      const next = speeds[(speeds.indexOf(state.aiSpeed) + 1) % speeds.length];
+      state.aiSpeed = next;
+      if (core?.state) core.state.rate = next;
+      render(host);
+    });
+
+    host.querySelector('#ss-rp-hf')?.addEventListener('click', () => {
+      state.handsFree = !state.handsFree;
+      core.showToast(state.handsFree ? 'เปิดโหมดคุยแฮนด์ฟรีแล้ว' : 'ปิดโหมดคุยแฮนด์ฟรี', 'VOICE');
+      render(host);
+    });
+
+    const triggerMic = () => {
       if (state.listening) {
         state.recCtrl?.stop();
         return;
@@ -381,7 +403,14 @@ export function createRoleplayController(core) {
         onError: (msg) => { state.listening = false; core.showToast(msg, 'MIC'); render(host); },
         onEnd: () => { if (state.listening) { state.listening = false; render(host); } }
       });
-    });
+    };
+
+    host.querySelector('#ss-rp-mic')?.addEventListener('click', triggerMic);
+    if (state.handsFree && !state.busy && !state.listening && state.messages.length > 0 && state.messages[state.messages.length - 1].role === 'ai') {
+      setTimeout(() => {
+        if (state.handsFree && !state.busy && !state.listening && state.activeScenario) triggerMic();
+      }, 1200);
+    }
 
     host.querySelector('#ss-rp-form')?.addEventListener('submit', (e) => {
       e.preventDefault();

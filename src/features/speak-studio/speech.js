@@ -1,19 +1,91 @@
-// SpeechRecognition, slow TTS (0.6x), lexicon pinyin cache, and ext storage helpers
+// SpeechRecognition (Web Speech + Cloud Chirp 2 STT fallback), slow TTS (0.6x), lexicon pinyin cache, and ext storage helpers
 import { buildCharPinyinMap } from './scoring.js';
+import { transcribeAudioWithChirp2 } from '../../modules/gcp-ai.js';
 
 let cachedCharPyMap = null;
 
 export function hasSpeechRecognition() {
-  return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  return Boolean(
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition ||
+    (navigator?.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined')
+  );
+}
+
+function startCloudChirpStt({ lang = 'zh-CN', onResult, onError, onEnd, onStart } = {}) {
+  const gcpLang = String(lang).toLowerCase().startsWith('th') ? 'th-TH' : 'cmn-Hans-CN';
+  let stream = null;
+  let recorder = null;
+  let stopped = false;
+  const chunks = [];
+
+  const cleanup = () => {
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      stream = null;
+    }
+  };
+
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((s) => {
+    if (stopped) {
+      s.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    stream = s;
+    recorder = new MediaRecorder(s);
+    recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size > 0) chunks.push(ev.data); };
+    recorder.onstop = async () => {
+      cleanup();
+      try {
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        const res = await transcribeAudioWithChirp2(blob, gcpLang);
+        if (res?.transcript) {
+          onResult?.(res.transcript.trim(), res);
+        } else {
+          onError?.('ไม่ได้ยินเสียงพูด กรุณาลองกดพูดใหม่อีกครั้ง');
+        }
+      } catch {
+        onError?.('ไม่สามารถถอดเสียงผ่าน Cloud Chirp 2 ได้ในขณะนี้');
+      } finally {
+        onEnd?.();
+      }
+    };
+    recorder.start();
+    onStart?.();
+    // Auto-stop after 8 seconds for single-utterance mode
+    setTimeout(() => {
+      if (recorder && recorder.state === 'recording') {
+        try { recorder.stop(); } catch (_) {}
+      }
+    }, 8000);
+  }).catch(() => {
+    onError?.('กรุณาอนุญาตการใช้ไมโครโฟนในเบราว์เซอร์');
+    onEnd?.();
+  });
+
+  return {
+    stop() {
+      stopped = true;
+      if (recorder && recorder.state === 'recording') {
+        try { recorder.stop(); } catch (_) {}
+      } else {
+        cleanup();
+      }
+    }
+  };
 }
 
 /**
  * Start one-shot SpeechRecognition (zh-CN or th-TH).
+ * Uses Web Speech API by default, or Cloud Speech-to-Text V2 (Chirp 2) when `preferCloud: true` or browser lacks Web Speech.
  * Returns a controller { stop() }.
  */
-export function startSpeechRecognition({ lang = 'zh-CN', onResult, onError, onEnd, onStart } = {}) {
+export function startSpeechRecognition({ lang = 'zh-CN', preferCloud = false, onResult, onError, onEnd, onStart } = {}) {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
+  if (preferCloud || !SR) {
+    if (navigator?.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined') {
+      return startCloudChirpStt({ lang, onResult, onError, onEnd, onStart });
+    }
     onError?.('เบราว์เซอร์นี้ไม่รองรับการรับเสียง (แนะนำ Chrome / Edge หรือพิมพ์ข้อความแทน)');
     return { stop() {} };
   }
