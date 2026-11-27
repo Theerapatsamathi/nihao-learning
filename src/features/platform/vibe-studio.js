@@ -8,10 +8,59 @@ import { fireConfettiBurst } from './ux-polish.js';
 const THEME_KEY = 'nihao_world_theme_v1';
 
 const THEMES = {
-  jade: { name: '💚 หยกจักรพรรดิ', accent: '#10b981', bgTint: '' },
-  lantern: { name: '🏮 โคมแดงตรุษจีน', accent: '#dc2626', bgTint: 'linear-gradient(180deg, rgba(127,29,29,0.08), rgba(180,83,9,0.06))' },
-  cyber: { name: '🌃 เซี่ยงไฮ้ไซเบอร์', accent: '#06b6d4', bgTint: 'linear-gradient(135deg, rgba(15,23,42,0.12), rgba(88,28,135,0.10))' },
-  ink: { name: '🖌️ หมึกพู่กันมินิมอล', accent: '#334155', bgTint: 'linear-gradient(180deg, rgba(241,245,249,0.5), rgba(226,232,240,0.35))' }
+  jade: {
+    name: '💚 หยกจักรพรรดิ',
+    accent: '#10b981',
+    css: `
+      body, .app-shell, main {
+        background: radial-gradient(circle at 15% 15%, rgba(16,185,129,0.22), transparent 45%),
+                    radial-gradient(circle at 85% 80%, rgba(251,191,36,0.16), transparent 45%),
+                    #071512 !important;
+      }
+      .card-panel, .ss-card, .gr-card { border-color: rgba(16,185,129,0.35) !important; box-shadow: 0 8px 28px rgba(6,78,59,0.28) !important; }
+      .nihao-spark { background: radial-gradient(circle, #34d399, #fbbf24) !important; opacity: 0.7 !important; }
+    `
+  },
+  lantern: {
+    name: '🏮 โคมแดงตรุษจีน',
+    accent: '#ef4444',
+    css: `
+      body, .app-shell, main {
+        background: radial-gradient(circle at 20% 10%, rgba(220,38,38,0.32), transparent 50%),
+                    radial-gradient(circle at 80% 85%, rgba(245,158,11,0.26), transparent 50%),
+                    #1a0707 !important;
+      }
+      .card-panel, .ss-card, .gr-card { border-color: rgba(245,158,11,0.45) !important; box-shadow: 0 8px 30px rgba(185,28,28,0.32) !important; }
+      .btn-primary { background: linear-gradient(135deg, #dc2626, #d97706) !important; }
+      .nihao-spark { background: radial-gradient(circle, #fbbf24, #ef4444) !important; width: 10px !important; height: 10px !important; opacity: 0.85 !important; }
+    `
+  },
+  cyber: {
+    name: '🌃 เซี่ยงไฮ้ไซเบอร์',
+    accent: '#06b6d4',
+    css: `
+      body, .app-shell, main {
+        background: radial-gradient(circle at 15% 20%, rgba(6,182,212,0.28), transparent 45%),
+                    radial-gradient(circle at 85% 75%, rgba(217,70,239,0.26), transparent 48%),
+                    #09061a !important;
+      }
+      .card-panel, .ss-card, .gr-card { border-color: rgba(6,182,212,0.48) !important; box-shadow: 0 0 24px rgba(6,182,212,0.22) !important; }
+      .btn-primary { background: linear-gradient(135deg, #06b6d4, #a855f7) !important; }
+      .nihao-spark { background: radial-gradient(circle, #22d3ee, #e879f9) !important; opacity: 0.85 !important; }
+    `
+  },
+  ink: {
+    name: '🖌️ หมึกพู่กันมินิมอล',
+    accent: '#64748b',
+    css: `
+      body, .app-shell, main {
+        background: radial-gradient(circle at 50% 0%, rgba(148,163,184,0.18), transparent 55%),
+                    #0f1218 !important;
+      }
+      .card-panel, .ss-card, .gr-card { border-color: rgba(203,213,225,0.25) !important; }
+      .nihao-spark { background: radial-gradient(circle, #f8fafc, #94a3b8) !important; opacity: 0.55 !important; }
+    `
+  }
 };
 
 // Chinese Gong Pentatonic Frequencies (C4, D4, E4, G4, A4, C5, D5, E5, G5)
@@ -148,7 +197,7 @@ export function applyWorldTheme(themeId) {
     document.head.appendChild(styleEl);
   }
   const t = THEMES[id];
-  styleEl.textContent = t.bgTint ? `body { background-image: ${t.bgTint}; }` : '';
+  styleEl.textContent = t.css || '';
   return id;
 }
 

@@ -61,20 +61,20 @@ const POLISH_CSS = `
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 0;
+    z-index: 40;
     overflow: hidden;
   }
   @keyframes nihaoDrift {
     0% { transform: translateY(105vh) translateX(0) scale(0.7); opacity: 0; }
-    15% { opacity: 0.45; }
-    85% { opacity: 0.35; }
-    100% { transform: translateY(-10vh) translateX(28px) scale(1.15); opacity: 0; }
+    15% { opacity: 0.75; }
+    85% { opacity: 0.65; }
+    100% { transform: translateY(-10vh) translateX(34px) scale(1.25); opacity: 0; }
   }
   .nihao-spark {
     position: absolute;
     border-radius: 999px;
     animation: nihaoDrift linear infinite;
-    filter: blur(0.5px);
+    box-shadow: 0 0 12px currentColor;
   }
 
   /* Floating RPG +XP Popup */
