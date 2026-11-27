@@ -16,6 +16,8 @@ import {
   generateVertexImagen,
   detectCloudVisionText,
   translateCloudText,
+  bigqueryInsertEvent,
+  startVertexVeoScene,
   getCacheBucket,
   getProjectId,
   verifyFirebaseIdToken
@@ -277,6 +279,20 @@ async function handleApi(req, res, urlObj) {
         cloudScheduler: true
       }
     });
+  }
+
+  // ---- BigQuery Learning Analytics Event Endpoint ----
+  if (p === '/api/analytics/event' && req.method === 'POST') {
+    const body = await readJsonBody(req, 32 * 1024);
+    const row = {
+      ts: new Date().toISOString(),
+      userId,
+      eventType: String(body.eventType || 'practice').slice(0, 48),
+      detail: String(body.detail || '').slice(0, 200),
+      score: Number(body.score || 0)
+    };
+    const streamed = await bigqueryInsertEvent(row);
+    return sendJson(res, 200, { ok: true, streamed });
   }
 
   // ---- Cloud Scheduler Weekly Reset Webhook (League + Boss Raid) ----
@@ -740,6 +756,93 @@ async function handleApi(req, res, urlObj) {
     }
     const uiLang = String(req.headers['x-nihao-lang'] || body.lang || 'th').toLowerCase() === 'en' ? 'English' : 'Thai';
     const usage = { used: quota.used, limit: quota.limit, remaining: quota.remaining };
+
+    // ---- China News & Trends Today (Gemini + Google Search Grounding) ----
+    if (p === '/api/ai/china-news') {
+      const topic = String(body.topic || 'เทรนด์และข่าวสนุกๆ ในจีนวันนี้').trim().slice(0, 100);
+      const level = String(body.level || 'HSK 1-3').trim().slice(0, 20);
+      const ai = createGenAiClient();
+      let groundingText = '';
+      try {
+        const gRes = await ai.models.generateContent({
+          model: MODEL_CANDIDATES[0],
+          contents: `Search for 1 interesting, positive current news or cultural trend in China right now about "${topic}" and summarize the key facts in 3 bullet points.`,
+          config: { tools: [{ googleSearch: {} }] }
+        });
+        groundingText = String(gRes.text || '').trim().slice(0, 1200);
+      } catch {
+        groundingText = '';
+      }
+      const { data, model } = await generateStructuredJson({
+        contents: `Turn this current China trend into a fun ${level} Mandarin mini-news article:\n${groundingText || `Current lifestyle & tech trend in China about ${topic}`}`,
+        systemInstruction: `Return JSON {headline (${uiLang}), summaryTh (${uiLang}), lines:[{hz, py, th (${uiLang})}], slangSpotlight:[{hz, py, th (${uiLang}), usage (${uiLang})}]}. Keep 4 short Mandarin lines and 2 modern Chinese slang/keywords.`,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            headline: { type: Type.STRING },
+            summaryTh: { type: Type.STRING },
+            lines: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: { hz: { type: Type.STRING }, py: { type: Type.STRING }, th: { type: Type.STRING } },
+                required: ['hz', 'py', 'th']
+              }
+            },
+            slangSpotlight: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: { hz: { type: Type.STRING }, py: { type: Type.STRING }, th: { type: Type.STRING }, usage: { type: Type.STRING } },
+                required: ['hz', 'py', 'th', 'usage']
+              }
+            }
+          },
+          required: ['headline', 'summaryTh', 'lines', 'slangSpotlight']
+        }
+      });
+      return sendJson(res, 200, { ok: true, model, grounded: Boolean(groundingText), usage, news: data });
+    }
+
+    // ---- AI Mnemonic Rap / Jingle Generator ----
+    if (p === '/api/ai/vocab-rap') {
+      const topic = String(body.topic || 'อาหารและเครื่องดื่มจีน').trim().slice(0, 100);
+      const { data, model } = await generateStructuredJson({
+        contents: `Write a catchy, rhythmic 4-bar Mandarin Chinese mnemonic rap/chant for beginners about "${topic}" so learners remember the words effortlessly.`,
+        systemInstruction: `Return JSON {title (${uiLang}), bpm (integer 85-110), bars:[{hz, py, th (${uiLang}), beatCue}]}. Make the Chinese lines rhyme and rhythmically fun!`,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            bpm: { type: Type.INTEGER },
+            bars: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: { hz: { type: Type.STRING }, py: { type: Type.STRING }, th: { type: Type.STRING }, beatCue: { type: Type.STRING } },
+                required: ['hz', 'py', 'th', 'beatCue']
+              }
+            }
+          },
+          required: ['title', 'bpm', 'bars']
+        }
+      });
+      return sendJson(res, 200, { ok: true, model, usage, rap: data });
+    }
+
+    // ---- Vertex AI Veo Short Video Scene (with Imagen 3 fallback) ----
+    if (p === '/api/ai/video-scene') {
+      const prompt = String(body.prompt || 'Cozy neon night market in Shanghai with steaming dumplings and bubble tea').trim().slice(0, 260);
+      const veo = await startVertexVeoScene(prompt);
+      if (veo?.operationName) {
+        return sendJson(res, 200, { ok: true, mode: 'veo-lro', ...veo, usage });
+      }
+      const fallbackImg = await generateVertexImagen(`${prompt}. Cinematic 16:9 film still, warm lighting, no text`, '16:9');
+      if (fallbackImg?.imageUrl) {
+        return sendJson(res, 200, { ok: true, mode: 'imagen-still', ...fallbackImg, usage });
+      }
+      return sendJson(res, 503, { ok: false, error: 'Veo / Imagen 3 ไม่พร้อมใช้งานในสภาพแวดล้อมนี้' });
+    }
 
     // ---- AI Personal Podcast Generator (2-host Chirp 3 HD Dialogue) ----
     if (p === '/api/ai/podcast') {

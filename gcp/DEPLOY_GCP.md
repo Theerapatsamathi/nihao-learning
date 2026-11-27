@@ -81,3 +81,24 @@ npm run start:gcp
 1. ตั้ง **Billing Budget Alert** ใน Google Cloud Console → Billing → Budgets & alerts (เตือนที่ 50%, 80%, 100%)
 2. ระบบแคชเสียง TTS และรูป Imagen 3 ลง `gs://${PROJECT_ID}-nihao-cache` อัตโนมัติ ทำให้ไม่เสียเครดิตเจนซ้ำ
 3. `--min-instances=0` ทำให้ตอนไม่มีคนใช้งานไม่เสียค่าเครื่องเลย
+
+---
+
+## (เสริม) เปิด BigQuery Analytics + Cloud Armor กันบอท
+```bash
+# สร้าง BigQuery Dataset & Table สำหรับวิเคราะห์การเรียน (ส่งเข้า Looker Studio ได้ฟรี)
+bq mk --location=asia-southeast1 ${PROJECT_ID}:nihao_analytics
+bq mk --table ${PROJECT_ID}:nihao_analytics.learning_events ts:TIMESTAMP,userId:STRING,eventType:STRING,detail:STRING,score:FLOAT
+
+# สร้าง Cloud Armor Rate-Limit Policy (กันบอทยิง API ผลาญเครดิต: 120 req/min ต่อ IP)
+gcloud compute security-policies create nihao-rate-limit --description="Protect Nihao AI APIs"
+gcloud compute security-policies rules create 1000 \
+  --security-policy=nihao-rate-limit \
+  --src-ip-ranges="*" \
+  --action=throttle \
+  --rate-limit-threshold-count=120 \
+  --rate-limit-threshold-interval-sec=60 \
+  --conform-action=allow \
+  --exceed-action=deny-429 \
+  --enforce-on-key=IP
+```

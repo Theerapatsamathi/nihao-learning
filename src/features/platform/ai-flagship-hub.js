@@ -8,6 +8,8 @@ import {
   generatePersonalPodcast,
   generateVisualMnemonic,
   generateWeaknessDrill,
+  fetchChinaNewsToday,
+  generateVocabRap,
   buildShareableLevelCardDataUrl
 } from '../../modules/gcp-ai.js';
 
@@ -18,6 +20,8 @@ export function renderAiFlagshipHub(core, host) {
   let podcastData = null;
   let mnemonicData = null;
   let drillData = null;
+  let newsData = null;
+  let rapData = null;
   let cardDataUrl = null;
   let activeAudio = null;
 
@@ -55,6 +59,8 @@ export function renderAiFlagshipHub(core, host) {
         </div>
         <div class="ss-actions" style="margin:10px 0 14px;flex-wrap:wrap;gap:6px">
           <button type="button" class="btn-secondary ${activeTab === 'podcast' ? 'is-active' : ''}" data-ftab="podcast">🎙️ AI Podcast</button>
+          <button type="button" class="btn-secondary ${activeTab === 'news' ? 'is-active' : ''}" data-ftab="news">📰 ข่าวจีนวันนี้</button>
+          <button type="button" class="btn-secondary ${activeTab === 'rap' ? 'is-active' : ''}" data-ftab="rap">🎵 แร็ปจำศัพท์</button>
           <button type="button" class="btn-secondary ${activeTab === 'mnemonic' ? 'is-active' : ''}" data-ftab="mnemonic">🎨 ภาพช่วยจำ</button>
           <button type="button" class="btn-secondary ${activeTab === 'drill' ? 'is-active' : ''}" data-ftab="drill">🧠 ซ่อมจุดอ่อน</button>
           <button type="button" class="btn-secondary ${activeTab === 'card' ? 'is-active' : ''}" data-ftab="card">🏆 การ์ดแชร์เลเวล</button>
@@ -185,6 +191,91 @@ export function renderAiFlagshipHub(core, host) {
       body.querySelectorAll('.fd-speak').forEach((b) => {
         b.addEventListener('click', () => core?.speak?.(b.dataset.hz));
       });
+    }
+
+    if (activeTab === 'news') {
+      body.innerHTML = `
+        <div class="ss-input-row" style="margin-bottom:10px">
+          <input id="fn-topic" class="ss-input" placeholder="หัวข้อข่าวจีน เช่น เทคโนโลยี, อาหารฮิต, ซีรีส์จีน..." value="เทรนด์และข่าวสนุกๆ ในจีนวันนี้" />
+          <button type="button" class="btn-primary" id="fn-gen" ${busy ? 'disabled' : ''}>${busy ? 'กำลังค้นข่าว...' : '📰 ดึงข่าวจีนวันนี้'}</button>
+        </div>
+        ${newsData ? `
+          <div class="ss-card" style="padding:12px">
+            <h4>📰 ${esc(newsData.headline)}</h4>
+            <p class="ss-muted">${esc(newsData.summaryTh)}</p>
+            ${(newsData.lines || []).map((l) => `
+              <div style="padding:6px 0;border-bottom:1px solid rgba(148,163,184,0.2)">
+                <div class="hanzi-font" style="font-size:1.05rem">${esc(l.hz)}</div>
+                <div class="ss-py">${esc(l.py)}</div>
+                <div class="ss-th">${esc(l.th)}</div>
+              </div>
+            `).join('')}
+            ${(newsData.slangSpotlight || []).length ? `
+              <div style="margin-top:10px;padding:10px;border-radius:10px;background:rgba(251,191,36,0.12)">
+                <strong>🔥 ศัพท์สแลงจีนยุคใหม่:</strong>
+                ${newsData.slangSpotlight.map((s) => `<div style="margin-top:4px"><strong class="hanzi-font">${esc(s.hz)}</strong> (${esc(s.py)}) — ${esc(s.th)} <small>(${esc(s.usage)})</small></div>`).join('')}
+              </div>
+            ` : ''}
+          </div>
+        ` : '<p class="ss-muted">ดึงข่าว/เทรนด์จริงในจีนวันนี้ด้วย Gemini + Google Search Grounding แล้วย่อยเป็นบทอ่าน HSK 1–3</p>'}
+      `;
+      body.querySelector('#fn-gen')?.addEventListener('click', async () => {
+        busy = true;
+        render();
+        try {
+          const topic = host.querySelector('#fn-topic')?.value || 'เทรนด์และข่าวสนุกๆ ในจีนวันนี้';
+          const res = await fetchChinaNewsToday({ topic });
+          newsData = res.news;
+        } catch (err) {
+          core?.showToast?.(err.message || 'ดึงข่าวไม่สำเร็จ', 'AI');
+        } finally {
+          busy = false;
+          render();
+        }
+      });
+    }
+
+    if (activeTab === 'rap') {
+      body.innerHTML = `
+        <div class="ss-input-row" style="margin-bottom:10px">
+          <input id="fr-topic" class="ss-input" placeholder="หมวดคำศัพท์ เช่น อาหาร, ตัวเลข, ทักทาย..." value="อาหารและเครื่องดื่มจีน" />
+          <button type="button" class="btn-primary" id="fr-gen" ${busy ? 'disabled' : ''}>${busy ? 'กำลังแต่งแร็ป...' : '🎵 แต่งแร็ปจำศัพท์'}</button>
+        </div>
+        ${rapData ? `
+          <div class="ss-card" style="padding:12px">
+            <h4>🎵 ${esc(rapData.title)} <span class="ss-pill">${Number(rapData.bpm || 96)} BPM</span></h4>
+            <div class="ss-actions" style="margin:8px 0">
+              <button type="button" class="btn-primary" id="fr-play">▶ ร้องแร็ปเลย (Chirp 3 HD)</button>
+              <button type="button" class="btn-secondary" id="fr-stop">⏹ หยุด</button>
+            </div>
+            ${(rapData.bars || []).map((b, i) => `
+              <div style="padding:8px;border-bottom:1px solid rgba(148,163,184,0.2)">
+                <div class="hanzi-font" style="font-size:1.1rem">🎤 ${i + 1}. ${esc(b.hz)}</div>
+                <div class="ss-py">${esc(b.py)}</div>
+                <div class="ss-th">${esc(b.th)} <small style="opacity:0.7">[${esc(b.beatCue)}]</small></div>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<p class="ss-muted">ให้ Gemini แต่งแร็ป 4 บรรทัดติดหูจากคำศัพท์จีนที่อยากจำ</p>'}
+      `;
+      body.querySelector('#fr-gen')?.addEventListener('click', async () => {
+        busy = true;
+        render();
+        try {
+          const topic = host.querySelector('#fr-topic')?.value || 'อาหารและเครื่องดื่มจีน';
+          const res = await generateVocabRap({ topic });
+          rapData = res.rap;
+        } catch (err) {
+          core?.showToast?.(err.message || 'แต่งแร็ปไม่สำเร็จ', 'AI');
+        } finally {
+          busy = false;
+          render();
+        }
+      });
+      body.querySelector('#fr-play')?.addEventListener('click', () => {
+        playPodcastSequence((rapData?.bars || []).map((b, i) => ({ speaker: i % 2 === 0 ? 'B' : 'A', hz: b.hz })));
+      });
+      body.querySelector('#fr-stop')?.addEventListener('click', stopAudio);
     }
 
     if (activeTab === 'card') {

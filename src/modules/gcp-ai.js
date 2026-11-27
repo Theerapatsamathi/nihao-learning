@@ -107,6 +107,47 @@ export async function generateWeaknessDrill({ mistakes = [], weakTones = [], lan
   return data;
 }
 
+export async function fetchChinaNewsToday({ topic = 'เทรนด์และข่าวสนุกๆ ในจีนวันนี้', level = 'HSK 1-3', lang = 'th' } = {}) {
+  const res = await fetch('/api/ai/china-news', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Nihao-Lang': lang },
+    body: JSON.stringify({ topic, level, lang })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || 'China News unavailable');
+  return data;
+}
+
+export async function generateVocabRap({ topic = 'อาหารและเครื่องดื่มจีน', lang = 'th' } = {}) {
+  const res = await fetch('/api/ai/vocab-rap', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Nihao-Lang': lang },
+    body: JSON.stringify({ topic, lang })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || 'Vocab Rap unavailable');
+  return data;
+}
+
+export async function generateVideoScene({ prompt = '' } = {}) {
+  const res = await fetch('/api/ai/video-scene', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || 'Video scene unavailable');
+  return data;
+}
+
+export function trackBigQueryEvent(eventType, detail = '', score = 0) {
+  fetch('/api/analytics/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventType, detail, score })
+  }).catch(() => {});
+}
+
 /**
  * Renders a 1080x1350 Spotify-Wrapped-style Shareable Chinese Level Card on Canvas and returns its data URL.
  */

@@ -483,3 +483,58 @@ export async function getGcpSecret(secretName, version = 'latest') {
     return null;
   }
 }
+
+// ---- BigQuery Streaming Analytics Helper ----
+
+export async function bigqueryInsertEvent(row) {
+  const project = getProjectId();
+  const dataset = String(process.env.BQ_DATASET || '').trim();
+  const table = String(process.env.BQ_TABLE || 'learning_events').trim();
+  if (!project || !dataset) return false;
+  const token = await getGcpAccessToken();
+  if (!token) return false;
+  const url = `https://bigquery.googleapis.com/bigquery/v2/projects/${encodeURIComponent(project)}/datasets/${encodeURIComponent(dataset)}/tables/${encodeURIComponent(table)}/insertAll`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rows: [{ insertId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, json: row }]
+      }),
+      signal: AbortSignal.timeout(3000)
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ---- Vertex AI Veo Short Video Scene Generator (with GCS Cache) ----
+
+export async function startVertexVeoScene(prompt) {
+  const project = getProjectId();
+  const location = getGcpLocation();
+  const bucket = getCacheBucket();
+  const token = await getGcpAccessToken();
+  const cleanPrompt = String(prompt || '').trim().slice(0, 320);
+  if (!project || !token || !cleanPrompt) return null;
+
+  const model = process.env.VERTEX_VEO_MODEL || 'veo-2.0-generate-001';
+  const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${encodeURIComponent(project)}/locations/${encodeURIComponent(location)}/publishers/google/models/${encodeURIComponent(model)}:predictLongRunning`;
+  const parameters = { aspectRatio: '16:9', durationSeconds: 5, sampleCount: 1 };
+  if (bucket) parameters.storageUri = `gs://${bucket}/veo/`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instances: [{ prompt: cleanPrompt }], parameters }),
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return { operationName: data?.name || null, model };
+  } catch {
+    return null;
+  }
+}
