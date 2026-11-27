@@ -10,6 +10,7 @@ import { collectWhatsNewTabs } from './whats-new.js';
 import { initLanguageSwitcher, initFirebaseGoogleAuth } from './i18n-firebase-auth.js';
 import { renderAiFlagshipHub } from './ai-flagship-hub.js';
 import { renderRetentionSuite } from './retention-suite.js';
+import { renderViralChineseLab } from './viral-studio.js';
 import { initUxPolish } from './ux-polish.js';
 
 const core = window.NihaoCore;
@@ -44,6 +45,20 @@ if (core) {
     sectionTitle: '✨ AI Studio',
     render(host) {
       renderRetentionSuite(core, host);
+    }
+  });
+
+  core.registerTab({
+    id: 'viral-chinese-lab',
+    label: '🏮 ชื่อจีน & WeChat',
+    title: '🏮 Fun & Viral Chinese Lab',
+    desc: 'ตั้งชื่อจีนมงคล + ตราประทับแดง · แชท WeChat · แกะเพลง/ซีรีส์จีน · ใบเกียรติบัตร HSK',
+    emoji: '🏮',
+    iconClass: 'icon-rose',
+    section: 'ai',
+    sectionTitle: '✨ AI Studio',
+    render(host) {
+      renderViralChineseLab(core, host);
     }
   });
   const displayCtrl = initDisplayMode(core);

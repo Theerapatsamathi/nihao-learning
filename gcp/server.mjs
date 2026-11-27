@@ -757,6 +757,91 @@ async function handleApi(req, res, urlObj) {
     const uiLang = String(req.headers['x-nihao-lang'] || body.lang || 'th').toLowerCase() === 'en' ? 'English' : 'Thai';
     const usage = { used: quota.used, limit: quota.limit, remaining: quota.remaining };
 
+    // ---- Chinese Name Generator (3 Styles + Lucky Meaning) ----
+    if (p === '/api/ai/chinese-name') {
+      const thaiName = String(body.thaiName || 'สมชาย').trim().slice(0, 60);
+      const vibe = String(body.vibe || 'มงคลและทันสมัย').trim().slice(0, 80);
+      const { data, model } = await generateStructuredJson({
+        contents: `Create 3 authentic, auspicious Mandarin Chinese names for a Thai person named "${thaiName}" with vibe "${vibe}".`,
+        systemInstruction: `Return JSON {options:[{hz (2-3 Chinese chars), py, style ("มงคล" | "เท่" | "น่ารัก"), meaning (${uiLang}), luckyNote (${uiLang})}]}.`,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            options: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  hz: { type: Type.STRING },
+                  py: { type: Type.STRING },
+                  style: { type: Type.STRING },
+                  meaning: { type: Type.STRING },
+                  luckyNote: { type: Type.STRING }
+                },
+                required: ['hz', 'py', 'style', 'meaning', 'luckyNote']
+              }
+            }
+          },
+          required: ['options']
+        }
+      });
+      return sendJson(res, 200, { ok: true, model, usage, result: data });
+    }
+
+    // ---- WeChat Chat Simulator ----
+    if (p === '/api/ai/wechat') {
+      const persona = String(body.persona || 'เพื่อนจีนสายกิน').trim().slice(0, 80);
+      const msg = String(body.message || '你好！').trim().slice(0, 300);
+      const history = JSON.stringify((body.history || []).slice(-6)).slice(0, 1200);
+      const { data, model } = await generateStructuredJson({
+        contents: `Persona: ${persona}\nRecent chat: ${history}\nUser sent: "${msg}"`,
+        systemInstruction: `You are chatting on WeChat in casual, authentic Mandarin (HSK 1-3). Reply in 1-2 short natural messages. Return JSON {hz, py, th (${uiLang}), stickerEmoji, replyHint (suggested next reply in Chinese + Pinyin)}.`,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            hz: { type: Type.STRING },
+            py: { type: Type.STRING },
+            th: { type: Type.STRING },
+            stickerEmoji: { type: Type.STRING },
+            replyHint: { type: Type.STRING }
+          },
+          required: ['hz', 'py', 'th', 'stickerEmoji', 'replyHint']
+        }
+      });
+      return sendJson(res, 200, { ok: true, model, usage, reply: data });
+    }
+
+    // ---- Chinese Lyrics & Drama Breakdown ----
+    if (p === '/api/ai/lyrics') {
+      const text = String(body.text || '').trim().slice(0, 600);
+      if (!text) return sendJson(res, 400, { ok: false, error: 'Missing text' });
+      const { data, model } = await generateStructuredJson({
+        contents: `Break down these Chinese lyrics or drama lines for a ${uiLang} learner:\n${text}`,
+        systemInstruction: `Return JSON {mood (${uiLang}), lines:[{hz, py, th (${uiLang}), grammarNote (${uiLang})}]}. Keep each line concise and insightful.`,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            mood: { type: Type.STRING },
+            lines: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  hz: { type: Type.STRING },
+                  py: { type: Type.STRING },
+                  th: { type: Type.STRING },
+                  grammarNote: { type: Type.STRING }
+                },
+                required: ['hz', 'py', 'th', 'grammarNote']
+              }
+            }
+          },
+          required: ['mood', 'lines']
+        }
+      });
+      return sendJson(res, 200, { ok: true, model, usage, breakdown: data });
+    }
+
     // ---- China News & Trends Today (Gemini + Google Search Grounding) ----
     if (p === '/api/ai/china-news') {
       const topic = String(body.topic || 'เทรนด์และข่าวสนุกๆ ในจีนวันนี้').trim().slice(0, 100);
