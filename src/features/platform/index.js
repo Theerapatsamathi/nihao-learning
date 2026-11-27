@@ -11,6 +11,7 @@ import { initLanguageSwitcher, initFirebaseGoogleAuth } from './i18n-firebase-au
 import { renderAiFlagshipHub } from './ai-flagship-hub.js';
 import { renderRetentionSuite } from './retention-suite.js';
 import { renderViralChineseLab } from './viral-studio.js';
+import { renderChinaFunHub } from './china-fun-hub.js';
 import { initUxPolish } from './ux-polish.js';
 
 const core = window.NihaoCore;
@@ -59,6 +60,20 @@ if (core) {
     sectionTitle: '✨ AI Studio',
     render(host) {
       renderViralChineseLab(core, host);
+    }
+  });
+
+  core.registerTab({
+    id: 'china-fun-hub',
+    label: '🔮 เซียมซี & เที่ยวจีน',
+    title: '🔮 เที่ยวจีน & เกมสนุก (China Fun & Survival)',
+    desc: 'เขย่าเซียมซีสุภาษิตจีน · เกมสั่งอาหารงบ ¥100 · นักสืบปักกิ่ง · การ์ดเอาตัวรอดเต็มจอ',
+    emoji: '🔮',
+    iconClass: 'icon-purple',
+    section: 'ai',
+    sectionTitle: '✨ AI Studio',
+    render(host) {
+      renderChinaFunHub(core, host);
     }
   });
   const displayCtrl = initDisplayMode(core);
